@@ -1,5 +1,9 @@
 # Core ML Frameworks
-torch==2.1.0
+# PyTorch: Installiere mit CUDA 12.1 support via:
+# pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+torch>=2.1.0
+torchvision>=0.16.0
+torchaudio>=2.1.0
 transformers==4.35.0
 accelerate==0.25.0
 
@@ -41,3 +45,7 @@ flake8==6.1.0
 
 # Optional: TensorRT-LLM
 # tensorrt-llm==0.5.0
+
+# Note: Install PyTorch FIRST with CUDA support:
+# pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+# Then install rest: pip install -r requirements.txt
