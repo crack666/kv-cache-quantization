@@ -1,0 +1,149 @@
+{
+  "experiment_id": "mistralai_Mistral-7B-v0.1_fp16_20251129_143443",
+  "schema_version": "2.0",
+  "config": {
+    "model": "mistralai/Mistral-7B-v0.1",
+    "kv_precision": "fp16",
+    "nbits": 16,
+    "backend": "none",
+    "method": "baseline",
+    "device": "cuda",
+    "seed": 42,
+    "context_lengths": [
+      128,
+      512,
+      1024,
+      2048,
+      4096,
+      8192,
+      16384
+    ]
+  },
+  "environment": {
+    "python_version": "3.10.13",
+    "pytorch_version": "2.9.1+cu128",
+    "transformers_version": "4.57.1",
+    "cuda_version": "12.8",
+    "gpu_name": "NVIDIA GeForce RTX 5090",
+    "gpu_memory_gb": 34.2
+  },
+  "measurements": [
+    {
+      "context_length": 128,
+      "kv_cache": {
+        "total_bytes": 16777216,
+        "total_gb": 0.016777216,
+        "bytes_per_token": 131072.0
+      },
+      "vram": {
+        "before_gb": 21.070737408,
+        "after_gb": 21.213343744,
+        "delta_gb": 0.14260633600000006
+      },
+      "latency_ms": 380.9551696777344,
+      "perplexity": 1.111653447151184,
+      "timestamp": "2025-11-29T14:34:50.932612"
+    },
+    {
+      "context_length": 512,
+      "kv_cache": {
+        "total_bytes": 67108864,
+        "total_gb": 0.067108864,
+        "bytes_per_token": 131072.0
+      },
+      "vram": {
+        "before_gb": 21.257383936,
+        "after_gb": 21.43983616,
+        "delta_gb": 0.1824522239999986
+      },
+      "latency_ms": 59.7691535949707,
+      "perplexity": 1.1108955144882202,
+      "timestamp": "2025-11-29T14:34:51.046010"
+    },
+    {
+      "context_length": 1024,
+      "kv_cache": {
+        "total_bytes": 134217728,
+        "total_gb": 0.134217728,
+        "bytes_per_token": 131072.0
+      },
+      "vram": {
+        "before_gb": 21.347561472,
+        "after_gb": 21.720854528,
+        "delta_gb": 0.3732930560000014
+      },
+      "latency_ms": 109.46435546875,
+      "perplexity": 1.1106367111206055,
+      "timestamp": "2025-11-29T14:34:51.229052"
+    },
+    {
+      "context_length": 2048,
+      "kv_cache": {
+        "total_bytes": 268435456,
+        "total_gb": 0.268435456,
+        "bytes_per_token": 131072.0
+      },
+      "vram": {
+        "before_gb": 21.46080768,
+        "after_gb": 22.201102336,
+        "delta_gb": 0.7402946560000032
+      },
+      "latency_ms": 214.22169494628906,
+      "perplexity": 1.111586570739746,
+      "timestamp": "2025-11-29T14:34:51.519615"
+    },
+    {
+      "context_length": 4096,
+      "kv_cache": {
+        "total_bytes": 536870912,
+        "total_gb": 0.536870912,
+        "bytes_per_token": 131072.0
+      },
+      "vram": {
+        "before_gb": 21.714563072,
+        "after_gb": 23.16998656,
+        "delta_gb": 1.455423488000001
+      },
+      "latency_ms": 563.2243041992188,
+      "perplexity": 1.1316763162612915,
+      "timestamp": "2025-11-29T14:34:52.200636"
+    },
+    {
+      "context_length": 8192,
+      "kv_cache": {
+        "total_bytes": 1073741824,
+        "total_gb": 1.073741824,
+        "bytes_per_token": 131072.0
+      },
+      "vram": {
+        "before_gb": 22.264016896,
+        "after_gb": 25.367343104,
+        "delta_gb": 3.1033262079999986
+      },
+      "latency_ms": 1442.6395263671875,
+      "perplexity": 1.168070912361145,
+      "timestamp": "2025-11-29T14:34:53.859994"
+    },
+    {
+      "context_length": 16384,
+      "kv_cache": {
+        "total_bytes": 2147483648,
+        "total_gb": 2.147483648,
+        "bytes_per_token": 131072.0
+      },
+      "vram": {
+        "before_gb": 23.400214528,
+        "after_gb": 29.3477376,
+        "delta_gb": 5.947523071999999
+      },
+      "latency_ms": 4067.050537109375,
+      "perplexity": 1.1373533010482788,
+      "timestamp": "2025-11-29T14:34:58.423306"
+    }
+  ],
+  "summary": {
+    "avg_bytes_per_token": 131072.0,
+    "avg_perplexity": 1.1259818247386388,
+    "compression_ratio": 0.28125
+  }
+}
