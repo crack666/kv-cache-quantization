@@ -184,7 +184,11 @@ def run_experiment(
     # Experiment ID
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     precision = f"int{nbits}" if quantize else "fp16"
-    experiment_id = f"{model_name.replace('/', '_')}_{precision}_{timestamp}"
+    # Include backend in filename for quantized runs
+    if quantize:
+        experiment_id = f"{model_name.replace('/', '_')}_{precision}_{backend}_{timestamp}"
+    else:
+        experiment_id = f"{model_name.replace('/', '_')}_{precision}_{timestamp}"
     
     print("=" * 80)
     print(f"Experiment: {model_name}")

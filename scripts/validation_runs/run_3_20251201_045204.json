@@ -1,0 +1,132 @@
+{
+  "gpu": "NVIDIA GeForce RTX 5090",
+  "baseline_mb": 4972.96,
+  "peak_vram_delta_mb": 15144.02,
+  "measurements": [
+    {
+      "label": "Model Loaded",
+      "timestamp_sec": 5.221,
+      "vram_delta_mb": 14999.38,
+      "vram_raw_mb": 19972.34,
+      "vram_baseline_mb": 4972.96
+    },
+    {
+      "label": "FP16 Baseline - Before Generation",
+      "timestamp_sec": 5.239,
+      "vram_delta_mb": 15085.37,
+      "vram_raw_mb": 20058.32,
+      "vram_baseline_mb": 4972.96
+    },
+    {
+      "label": "FP16 Baseline - After Generation",
+      "timestamp_sec": 9.991,
+      "vram_delta_mb": 15144.02,
+      "vram_raw_mb": 20116.98,
+      "vram_baseline_mb": 4972.96
+    },
+    {
+      "label": "INT8 (HQQ) - Before Generation",
+      "timestamp_sec": 9.994,
+      "vram_delta_mb": 15127.24,
+      "vram_raw_mb": 20100.2,
+      "vram_baseline_mb": 4972.96
+    },
+    {
+      "label": "INT8 (HQQ) - After Generation",
+      "timestamp_sec": 15.151,
+      "vram_delta_mb": 15135.7,
+      "vram_raw_mb": 20108.66,
+      "vram_baseline_mb": 4972.96
+    },
+    {
+      "label": "INT4 (HQQ) - Before Generation",
+      "timestamp_sec": 15.154,
+      "vram_delta_mb": 15118.92,
+      "vram_raw_mb": 20091.88,
+      "vram_baseline_mb": 4972.96
+    },
+    {
+      "label": "INT4 (HQQ) - After Generation",
+      "timestamp_sec": 21.477,
+      "vram_delta_mb": 15122.98,
+      "vram_raw_mb": 20095.94,
+      "vram_baseline_mb": 4972.96
+    },
+    {
+      "label": "INT2 (HQQ) - Before Generation",
+      "timestamp_sec": 21.479,
+      "vram_delta_mb": 15106.21,
+      "vram_raw_mb": 20079.17,
+      "vram_baseline_mb": 4972.96
+    },
+    {
+      "label": "INT2 (HQQ) - After Generation",
+      "timestamp_sec": 28.597,
+      "vram_delta_mb": 15122.98,
+      "vram_raw_mb": 20095.94,
+      "vram_baseline_mb": 4972.96
+    }
+  ],
+  "throughput_measurements": [
+    {
+      "label": "FP16 Baseline",
+      "timestamp_sec": 9.991,
+      "ttft_ms": 31.448,
+      "tpt_ms": 20.965,
+      "tokens_per_second": 47.7,
+      "total_tokens": 109,
+      "total_time_ms": 2096.546,
+      "prompt_tokens": 9,
+      "generated_tokens": 100,
+      "peak_memory_mb": 13834.7,
+      "avg_power_watts": 287.6,
+      "energy_per_token_mj": 6028.95,
+      "power_samples": 42
+    },
+    {
+      "label": "INT8 (HQQ)",
+      "timestamp_sec": 15.151,
+      "ttft_ms": 38.278,
+      "tpt_ms": 25.519,
+      "tokens_per_second": 39.19,
+      "total_tokens": 109,
+      "total_time_ms": 2551.87,
+      "prompt_tokens": 9,
+      "generated_tokens": 100,
+      "peak_memory_mb": 13834.4,
+      "avg_power_watts": 255.0,
+      "energy_per_token_mj": 6507.6,
+      "power_samples": 51
+    },
+    {
+      "label": "INT4 (HQQ)",
+      "timestamp_sec": 21.477,
+      "ttft_ms": 48.218,
+      "tpt_ms": 32.145,
+      "tokens_per_second": 31.11,
+      "total_tokens": 109,
+      "total_time_ms": 3214.545,
+      "prompt_tokens": 9,
+      "generated_tokens": 100,
+      "peak_memory_mb": 13834.2,
+      "avg_power_watts": 223.7,
+      "energy_per_token_mj": 7191.21,
+      "power_samples": 64
+    },
+    {
+      "label": "INT2 (HQQ)",
+      "timestamp_sec": 28.597,
+      "ttft_ms": 53.0,
+      "tpt_ms": 35.333,
+      "tokens_per_second": 28.3,
+      "total_tokens": 109,
+      "total_time_ms": 3533.331,
+      "prompt_tokens": 9,
+      "generated_tokens": 100,
+      "peak_memory_mb": 13834.0,
+      "avg_power_watts": 213.7,
+      "energy_per_token_mj": 7551.35,
+      "power_samples": 71
+    }
+  ]
+}

@@ -1,0 +1,55 @@
+{
+  "gpu": "NVIDIA GeForce RTX 5090",
+  "baseline_mb": 5202.9,
+  "peak_vram_delta_mb": 709.73,
+  "measurements": [
+    {
+      "label": "1K x 1K Tensor (4 MB)",
+      "timestamp_sec": 0.22,
+      "vram_delta_mb": 529.94,
+      "vram_raw_mb": 5732.85,
+      "vram_baseline_mb": 5202.9
+    },
+    {
+      "label": "10K x 10K Tensor (400 MB)",
+      "timestamp_sec": 0.222,
+      "vram_delta_mb": 664.16,
+      "vram_raw_mb": 5867.07,
+      "vram_baseline_mb": 5202.9
+    },
+    {
+      "label": "After Cleanup",
+      "timestamp_sec": 0.227,
+      "vram_delta_mb": 508.97,
+      "vram_raw_mb": 5711.88,
+      "vram_baseline_mb": 5202.9
+    },
+    {
+      "label": "GPT-2 Loaded",
+      "timestamp_sec": 3.938,
+      "vram_delta_mb": 709.73,
+      "vram_raw_mb": 5912.63,
+      "vram_baseline_mb": 5202.9
+    },
+    {
+      "label": "After Model Cleanup",
+      "timestamp_sec": 5.723,
+      "vram_delta_mb": 545.69,
+      "vram_raw_mb": 5748.59,
+      "vram_baseline_mb": 5202.9
+    }
+  ],
+  "throughput_measurements": [
+    {
+      "label": "GPT-2 Generation",
+      "timestamp_sec": 5.433,
+      "ttft_ms": 8.134,
+      "tpt_ms": 5.422,
+      "tokens_per_second": 184.42,
+      "total_tokens": 55,
+      "total_time_ms": 271.123,
+      "prompt_tokens": 5,
+      "generated_tokens": 50
+    }
+  ]
+}
