@@ -8,9 +8,10 @@ für Quantisierung und Dequantisierung zu erhalten.
 Ergebnis: Wie viel Zeit verbringen wir mit Quant/Dequant vs. Attention?
 
 Usage:
-    python profile_quant_overhead.py                     # Default: Mistral-7B
-    python profile_quant_overhead.py --model Qwen/Qwen3-8B
-    python profile_quant_overhead.py --model meta-llama/Llama-3.1-8B
+    python profile_quant_overhead.py                                    # Default: Mistral-7B, contexts 128-4096
+    python profile_quant_overhead.py --model Qwen/Qwen3-8B              # Custom model
+    python profile_quant_overhead.py --context 512 1024 2048            # Specific contexts only
+    python profile_quant_overhead.py --output results/my_profile.json   # Custom output path
 """
 
 import argparse
@@ -251,9 +252,21 @@ if __name__ == "__main__":
             time.sleep(0.01)  # 100 Hz sampling
     
     # Parse command line arguments
-    parser = argparse.ArgumentParser(description="KV-Cache Quantization Profiler")
+    parser = argparse.ArgumentParser(
+        description="KV-Cache Quantization Profiler",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""Examples:
+  python profile_quant_overhead.py
+  python profile_quant_overhead.py --model Qwen/Qwen2-7B
+  python profile_quant_overhead.py --context 512 1024 2048
+  python profile_quant_overhead.py --model Qwen/Qwen3-8B --context 128 256 --output my_results.json
+        """)
     parser.add_argument("--model", type=str, default="mistralai/Mistral-7B-v0.1",
-                        help="HuggingFace model name (e.g., Qwen/Qwen3-8B)")
+                        help="HuggingFace model name (default: Mistral-7B-v0.1)")
+    parser.add_argument("--context", type=int, nargs="+", default=None,
+                        help="Target context lengths (default: 128 256 512 1024 2048 4096)")
+    parser.add_argument("--output", type=str, default=None,
+                        help="Output JSON path (default: results/raw/profile_<model>_<timestamp>.json)")
     args = parser.parse_args()
     
     model_name = args.model
@@ -284,7 +297,7 @@ if __name__ == "__main__":
     
     # Target context lengths (2er-Potenzen für wissenschaftliche Konsistenz)
     # max_new_tokens = target_context - prompt_tokens
-    target_contexts = [128, 256, 512, 1024, 2048, 4096]
+    target_contexts = args.context if args.context else [128, 256, 512, 1024, 2048, 4096]
     configs = [
         {"name": "FP16", "quantize": False},
         {"name": "INT8 (HQQ)", "quantize": True, "nbits": 8, "backend": "hqq"},
@@ -543,12 +556,16 @@ if __name__ == "__main__":
         ]
     }
     
-    results_dir = Path(__file__).parent.parent / "results" / "raw"
-    results_dir.mkdir(parents=True, exist_ok=True)
-    
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    model_short = model_name.split("/")[-1].lower().replace("-", "_")
-    output_file = results_dir / f"profile_{model_short}_{timestamp}.json"
+    # Determine output path
+    if args.output:
+        output_file = Path(args.output)
+        output_file.parent.mkdir(parents=True, exist_ok=True)
+    else:
+        results_dir = Path(__file__).parent.parent / "results" / "raw"
+        results_dir.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        model_short = model_name.split("/")[-1].lower().replace("-", "_")
+        output_file = results_dir / f"profile_{model_short}_{timestamp}.json"
     
     with open(output_file, "w") as f:
         json.dump(results_dict, f, indent=2)
