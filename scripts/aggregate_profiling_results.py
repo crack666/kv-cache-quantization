@@ -125,22 +125,42 @@ def save_latex_table(df: pd.DataFrame, output_dir: Path, context_filter: int = N
     ]
     
     df_export = df_filtered[columns_to_export].copy()
+
+    # Sort for readability: within each model and context, compare configs directly.
+    # Desired order: Model -> Context -> Config (FP16, INT8, INT4, INT2)
+    config_order = ['FP16', 'INT8 (HQQ)', 'INT4 (HQQ)', 'INT2 (HQQ)']
+    df_export['Config'] = pd.Categorical(df_export['Config'], categories=config_order, ordered=True)
+    df_export = df_export.sort_values(['Model', 'Context', 'Config'], kind='mergesort')
+    
+    # Rename column for LaTeX compatibility (replace Unicode Δ with \Delta command)
+    df_export.rename(columns={'ΔPPL (%)': r'$\Delta$PPL (\%)', 'Overhead (%)': r'Overhead (\%)'}, inplace=True)
     
     # Format columns for LaTeX
     df_export['Throughput (tok/s)'] = df_export['Throughput (tok/s)'].apply(lambda x: f"{x:.1f}")
     df_export['KV Cache (MB)'] = df_export['KV Cache (MB)'].apply(lambda x: f"{x:.1f}")
     df_export['Perplexity'] = df_export['Perplexity'].apply(lambda x: f"{x:.2f}")
-    df_export['ΔPPL (%)'] = df_export['ΔPPL (%)'].apply(lambda x: f"{x:+.1f}" if abs(x) > 0.01 else "0.0")
-    df_export['Overhead (%)'] = df_export['Overhead (%)'].apply(lambda x: f"{x:.1f}")
+    df_export[r'$\Delta$PPL (\%)'] = df_export[r'$\Delta$PPL (\%)'].apply(lambda x: f"{x:+.1f}" if abs(x) > 0.01 else "0.0")
+    df_export[r'Overhead (\%)'] = df_export[r'Overhead (\%)'].apply(lambda x: f"{x:.1f}")
     
-    # Generate LaTeX
+    # Generate LaTeX with longtable for multi-page support in landscape
+    # Use p{width} columns for text fields and right-aligned p{} for last two cols
     latex = df_export.to_latex(
         index=False,
-        column_format='l|l|r|r|r|r|r|r',
-        caption=caption,
-        label=f"tab:profiling_ctx{context_filter}" if context_filter else "tab:profiling_all",
-        escape=False
+        column_format=r'|p{2.2cm}|p{2.5cm}|r|r|r|r|>{\raggedleft\arraybackslash}p{1.3cm}|>{\raggedleft\arraybackslash}p{1.3cm}|',
+        escape=False,
+        longtable=True,  # Use longtable for landscape compatibility
+        caption='Vollständige KV-Cache Profiling-Ergebnisse (alle Kontexte)',
+        label='tab:profiling_all'
     )
+
+    # Pandas emits a \midrule directly before \endfirsthead/\endhead.
+    # With the BHT template this can trigger 'Misplaced \cr' / alignment errors.
+    # Dropping those specific midrules keeps the longtable valid and compiles reliably.
+    latex = latex.replace('\\midrule\n\\endfirsthead\n', '\\endfirsthead\n')
+    latex = latex.replace('\\midrule\n\\endhead\n', '\\endhead\n')
+    
+    # Remove the continuation caption to keep all pages consistent
+    latex = latex.replace('\\caption[]{Vollständige KV-Cache Profiling-Ergebnisse (alle Kontexte)} \\\\\n', '')
     
     # Write to file
     with open(output_file, 'w', encoding='utf-8') as f:
