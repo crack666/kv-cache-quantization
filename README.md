@@ -17,7 +17,37 @@ Dieses Repository enthält den **Code und die Experimente** für die Masterarbei
 
 ---
 
-## 🗂️ Repository-Struktur
+## � Scripts Overview
+
+### `profile_quant_overhead.py` - Complete KV-Cache Profiling
+
+Measures KV-cache size, perplexity, throughput, and quantization overhead across multiple context lengths.
+
+```bash
+# Default: Mistral-7B with contexts 128-4096
+python scripts/profile_quant_overhead.py
+
+# Custom model
+python scripts/profile_quant_overhead.py --model Qwen/Qwen2-7B
+
+# Specific context lengths only (e.g., fill gaps in existing data)
+python scripts/profile_quant_overhead.py --model Qwen/Qwen2-7B --context 512 1024 2048
+
+# Custom output path
+python scripts/profile_quant_overhead.py --output results/my_profile.json
+```
+
+**Output:** JSON file in `results/raw/profile_<model>_<timestamp>.json` with:
+- KV-cache sizes (MB) for FP16/INT8/INT4/INT2
+- Perplexity (PPL) for quality assessment
+- Throughput (tokens/s) and quantization overhead (%)
+- Power consumption (watts) and energy per token (mJ/tok)
+
+**Duration:** ~30-60 seconds for 6 contexts × 4 configs = 24 measurements
+
+---
+
+## �🗂️ Repository-Struktur
 
 ```
 .
