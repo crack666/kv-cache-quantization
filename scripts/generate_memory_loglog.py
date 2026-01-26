@@ -36,32 +36,42 @@ MODEL_DISPLAY = {
 }
 
 def load_mistral_data(results_dir: Path):
-    """Load all Mistral measurements."""
+    """Load all Mistral measurements from profile_*.json format."""
     records = []
     
-    for json_file in results_dir.glob('*.json'):
+    for json_file in results_dir.glob('profile_mistral*.json'):
         try:
             data = json.loads(json_file.read_text())
         except Exception:
             continue
         
-        if isinstance(data, dict) and 'config' in data and 'measurements' in data:
-            cfg = data.get('config', {})
-            model_id = cfg.get('model')
-            if model_id != 'mistralai/Mistral-7B-v0.1':
+        # New format: {'model': 'mistralai/Mistral-7B-v0.1', 'measurements': [...]}
+        if isinstance(data, dict) and 'measurements' in data:
+            model_id = data.get('model', '')
+            if 'Mistral' not in model_id:
                 continue
-            
-            precision = cfg.get('kv_precision', 'fp16')
-            backend = cfg.get('backend', 'none')
             
             for m in data.get('measurements', []):
                 try:
+                    config = m.get('config', 'FP16')
+                    # Map config names to precision
+                    if config == 'FP16':
+                        precision = 'fp16'
+                    elif 'INT8' in config:
+                        precision = 'int8'
+                    elif 'INT4' in config:
+                        precision = 'int4'
+                    elif 'INT2' in config:
+                        precision = 'int2'
+                    else:
+                        continue
+                    
                     records.append({
                         'precision': precision,
-                        'backend': backend,
-                        'context': int(m['context_length']),
-                        'kv_cache_gb': float(m['kv_cache']['total_gb']),
-                        'kv_cache_mb': float(m['kv_cache']['total_gb']) * 1024,
+                        'backend': 'hqq' if 'HQQ' in config else 'none',
+                        'context': int(m['context_len']),
+                        'kv_cache_gb': float(m['kv_cache_mb']) / 1024,
+                        'kv_cache_mb': float(m['kv_cache_mb']),
                     })
                 except Exception:
                     continue
@@ -119,8 +129,8 @@ def main():
         ax.set_xscale('log', base=2)
         ax.set_yscale('log', base=2)
         
-        # X-Achse: Zweierpotenzen
-        context_ticks = [512, 1024, 2048, 4096, 8192, 16384]
+        # X-Achse: Zweierpotenzen (nur bis 4k, da wir nur bis 4096 messen)
+        context_ticks = [128, 256, 512, 1024, 2048, 4096]
         ax.set_xticks(context_ticks)
         ax.set_xticklabels([f'{c//1024}k' if c >= 1024 else str(c) for c in context_ticks])
         
