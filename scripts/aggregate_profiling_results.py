@@ -138,8 +138,28 @@ def save_latex_table(df: pd.DataFrame, output_dir: Path, context_filter: int = N
     # Format columns for LaTeX
     df_export['Throughput (tok/s)'] = df_export['Throughput (tok/s)'].apply(lambda x: f"{x:.1f}")
     df_export['KV Cache (MB)'] = df_export['KV Cache (MB)'].apply(lambda x: f"{x:.1f}")
-    df_export['Perplexity'] = df_export['Perplexity'].apply(lambda x: f"{x:.2f}")
-    df_export[r'$\Delta$PPL (\%)'] = df_export[r'$\Delta$PPL (\%)'].apply(lambda x: f"{x:+.1f}" if abs(x) > 0.01 else "0.0")
+    
+    # Perplexity: use scientific notation for extreme values (>10000)
+    def format_ppl(x):
+        if x >= 10000:
+            exp = int(f"{x:.0e}".split('e+')[1])
+            mantissa = x / (10 ** exp)
+            return f"${mantissa:.1f} \\times 10^{{{exp}}}$"
+        return f"{x:.2f}"
+    df_export['Perplexity'] = df_export['Perplexity'].apply(format_ppl)
+    
+    # ΔPPL (%): use scientific notation for extreme values (>1000%)
+    def format_delta_ppl(x):
+        if abs(x) < 0.01:
+            return "0.0"
+        if abs(x) >= 1000:
+            exp = int(f"{abs(x):.0e}".split('e+')[1])
+            mantissa = x / (10 ** exp)
+            sign = "+" if x > 0 else ""
+            return f"${sign}{mantissa:.1f} \\times 10^{{{exp}}}$"
+        return f"{x:+.1f}"
+    df_export[r'$\Delta$PPL (\%)'] = df_export[r'$\Delta$PPL (\%)'].apply(format_delta_ppl)
+    
     df_export[r'Overhead (\%)'] = df_export[r'Overhead (\%)'].apply(lambda x: f"{x:.1f}")
     
     # Generate LaTeX with longtable for multi-page support in landscape
