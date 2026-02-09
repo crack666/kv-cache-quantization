@@ -312,6 +312,7 @@ def plot_ppl_7b_comparison(results_dir: Path, output_path: Path, max_context: in
     im = ax.imshow(matrix_plot, cmap=cmap, norm=norm, aspect='auto')
     
     # Annotations mit Werten
+    # Werte unter 1% werden auf "< 1%" vereinheitlicht (Messgenauigkeit rechtfertigt keine höhere Präzision)
     for i in range(len(available)):
         for j in range(len(precisions)):
             val = matrix[i, j]
@@ -325,10 +326,14 @@ def plot_ppl_7b_comparison(results_dir: Path, output_path: Path, max_context: in
                 text = f'{val:.1f}%'
                 color = 'black'
             elif val >= 1:
-                text = f'{val:.2f}%'
+                text = f'{val:.1f}%'
+                color = 'black'
+            elif abs(val) < 1:
+                # Werte zwischen -1% und +1% sind innerhalb der Messungenauigkeit
+                text = '< 1%'
                 color = 'black'
             else:
-                text = f'{val:.2f}%'
+                text = f'{val:.1f}%'
                 color = 'black'
             
             ax.text(j, i, text, ha='center', va='center', 
