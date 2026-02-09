@@ -1,254 +1,137 @@
-# KV-Cache Quantization for Long-Context Efficiency
+# KV-Cache Quantization for Long-Context LLMs
 
-**Masterarbeit**: Systematischer Vergleich von 16/8/4/2-Bit KV-Cache-Quantisierung für Large Language Models  
-**Student**: Lennart Behr (Medieninformatik M.Sc., BHT Berlin)  
+**Thesis**: Long-Context-Effizienz durch KV-Cache-Quantisierung bei Large Language Models  
+**Author**: Lennart Behr (Medieninformatik M.Sc., BHT Berlin)  
+**Supervisor**: Prof. Dr. Edlich  
 **Hardware**: NVIDIA RTX 5090 (32 GB VRAM)
 
 ---
 
-## 📋 Projektübersicht
+## Overview
 
-Dieses Repository enthält den **Code und die Experimente** für die Masterarbeit zu KV-Cache-Quantisierung. Ziel: Pareto-Analyse (Accuracy vs. VRAM) über verschiedene Quantisierungsmethoden (FP16/INT8/INT4/INT2) auf Long-Context-Benchmarks.
+This repository contains the **profiling code and measurement data** for the master thesis on KV-Cache quantization. We systematically evaluate INT8, INT4, and INT2 quantization of the Key-Value Cache across four LLMs with different Grouped Query Attention (GQA) architectures.
 
-**Kernfragen**:
-- Wie viel VRAM spart INT8/INT4/INT2 KV-Cache bei 4k/8k/16k/32k Context?
-- Wie stark sinkt die Accuracy (LongBench, Perplexity)?
-- Wann lohnt sich welche Bitbreite? (Guidelines für Practitioners)
+### Key Finding
 
----
-
-## � Scripts Overview
-
-### `profile_quant_overhead.py` - Complete KV-Cache Profiling
-
-Measures KV-cache size, perplexity, throughput, and quantization overhead across multiple context lengths.
-
-```bash
-# Default: Mistral-7B with contexts 128-4096
-python scripts/profile_quant_overhead.py
-
-# Custom model
-python scripts/profile_quant_overhead.py --model Qwen/Qwen2-7B
-
-# Specific context lengths only (e.g., fill gaps in existing data)
-python scripts/profile_quant_overhead.py --model Qwen/Qwen2-7B --context 512 1024 2048
-
-# Custom output path
-python scripts/profile_quant_overhead.py --output results/my_profile.json
-```
-
-**Output:** JSON file in `results/raw/profile_<model>_<timestamp>.json` with:
-- KV-cache sizes (MB) for FP16/INT8/INT4/INT2
-- Perplexity (PPL) for quality assessment
-- Throughput (tokens/s) and quantization overhead (%)
-- Power consumption (watts) and energy per token (mJ/tok)
-
-**Duration:** ~30-60 seconds for 6 contexts × 4 configs = 24 measurements
+> The GQA ratio is **not** a reliable predictor of quantization tolerance. Yi-1.5-9B (8:1) tolerates INT2 with only +15% PPL degradation, while Qwen2-7B (7:1) fails catastrophically at INT4.
 
 ---
 
-## �🗂️ Repository-Struktur
+## Models Tested
+
+| Model | Parameters | GQA Ratio | INT4 Tolerance | INT2 Tolerance |
+|-------|------------|-----------|----------------|----------------|
+| Mistral-7B-v0.1 | 7.2B | 4:1 | ✅ Excellent (-1.0% PPL) | ✅ Good (+2.2% PPL) |
+| Qwen3-8B | 8.2B | 4:1 | ✅ Good (+7.0% PPL) | ⚠️ Degraded (+96% PPL) |
+| Qwen2-7B | 7.6B | 7:1 | ❌ Fails | ❌ Fails |
+| Yi-1.5-9B | 8.8B | 8:1 | ✅ Excellent (-0.3% PPL) | ✅ Usable (+15% PPL) |
+
+---
+
+## Repository Structure
 
 ```
 .
-├── scripts/               # Python-Skripte für Training, Profiling, Benchmarking
-│   ├── profiler.py        # VRAM/Latenz/Throughput-Tracking
-│   ├── train_nanogpt.py   # nanoGPT Training (Week 1-2)
-│   ├── benchmark_runner.py # lm-eval Wrapper mit Profiling
-│   ├── quantize_kv_*.py   # INT8/INT4/INT2 Quantisierung
-│   └── plot_*.py          # Visualisierungen (Pareto, VRAM-Scaling, etc.)
-├── experiments/           # Wöchentliche Logs (Markdown)
-│   ├── week1_2_nanogpt.md
-│   ├── week3_4_7b_baseline.md
-│   └── ...
-├── results/               # Experiment-Daten & Plots
-│   ├── raw/               # JSON-Files pro Run (gitignored)
-│   ├── figures/           # PDF-Plots (Paper-Quality)
-│   ├── tables/            # LaTeX-Tabellen
-│   └── master_results.csv # Aggregierte Daten
-├── configs/               # JSON-Configs pro Experiment
-│   ├── nanogpt_fp16.json
-│   ├── mistral7b_int8kv.json
-│   └── ...
-├── docs/                  # Technische Dokumentation
-│   ├── profiling_guide.md # Wie VRAM/Latenz gemessen wird
-│   └── quantization_howto.md # INT8/INT4/INT2 Implementierung
-├── requirements.txt       # Python-Dependencies
-├── environment.yml        # Conda-Environment (reproduzierbar)
-├── .gitignore             # Ignoriert große Dateien (Checkpoints, raw results)
-└── README.md              # Diese Datei
+├── scripts/                    # Profiling and analysis scripts
+│   ├── profile_quant_overhead.py   # Main profiler (KV-cache, PPL, throughput)
+│   ├── aggregate_results.py        # Combine JSON results
+│   ├── analyze_delta_ppl.py        # PPL degradation analysis
+│   └── generate_*.py               # Table/figure generation
+├── results/
+│   ├── raw/                    # JSON measurement files (per model)
+│   ├── figures/                # Generated plots (PDF)
+│   └── tables/                 # LaTeX tables
+├── requirements.txt            # Python dependencies
+├── environment.yml             # Conda environment
+└── README.md
 ```
 
 ---
 
-## 🚀 Setup
+## Quick Start
 
-### **1. Environment erstellen**
+### 1. Setup Environment
+
 ```bash
-# Conda (empfohlen)
-conda create -n kv-quant python=3.10
-conda activate kv-quant
-
-# Oder venv
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# venv\Scripts\activate   # Windows
-```
-
-### **2. Dependencies installieren**
-```bash
-pip install -r requirements.txt
-
-# Oder mit Conda
 conda env create -f environment.yml
 conda activate kv-quant
+# or
+pip install -r requirements.txt
 ```
 
-### **3. CUDA/PyTorch testen**
+### 2. Run Profiling
+
 ```bash
-python -c "import torch; print(f'CUDA: {torch.cuda.is_available()}, GPU: {torch.cuda.get_device_name(0)}')"
-# Erwartete Ausgabe: CUDA: True, GPU: NVIDIA GeForce RTX 5090
+# Profile a model across context lengths 128-4096
+python scripts/profile_quant_overhead.py --model mistralai/Mistral-7B-v0.1
+
+# Profile specific context lengths
+python scripts/profile_quant_overhead.py --model Qwen/Qwen2-7B --context 512 1024 2048
 ```
 
----
+**Output:** JSON file in `results/raw/profile_<model>_<timestamp>.json` containing:
+- KV-cache sizes (MB) for FP16/INT8/INT4/INT2
+- Perplexity for quality assessment
+- Throughput (tokens/s) and quantization overhead (%)
 
-## 🔬 Quick Start
+### 3. Analyze Results
 
-### **Week 1-2: nanoGPT Baseline**
 ```bash
-# Training (1-2 Stunden auf RTX 5090)
-python scripts/train_nanogpt.py --config configs/nanogpt_fp16.json
+# Aggregate all JSON files into summary
+python scripts/aggregate_results.py
 
-# Evaluation: Perplexity + VRAM-Profiling
-python scripts/eval_perplexity.py --checkpoint results/nanogpt_fp16.pth
-
-# INT8 KV-Cache-Vergleich
-python scripts/train_nanogpt.py --config configs/nanogpt_int8kv.json
-```
-
-### **Week 3-4: 7B-Modell (Mistral/Llama)**
-```bash
-# Baseline: FP16 KV
-python scripts/benchmark_runner.py --config configs/mistral7b_fp16kv.json
-
-# INT8 KV
-python scripts/benchmark_runner.py --config configs/mistral7b_int8kv.json
-
-# Pareto-Plot generieren
-python scripts/plot_pareto.py --results results/master_results.csv
+# Generate PPL degradation analysis
+python scripts/analyze_delta_ppl.py
 ```
 
 ---
 
-## 📊 Experiment-Tracking
+## Quantization Backend
 
-**JSON-Output pro Run** (automatisch in `results/raw/`):
-```json
-{
-  "experiment_id": "mistral7b_int8kv_16k_2025-10-25T14-30",
-  "config": {
-    "model": "Mistral-7B-v0.1",
-    "kv_bits": 8,
-    "context_length": 16384
-  },
-  "metrics": {
-    "perplexity": 12.1,
-    "vram_peak_gb": 18.5,
-    "latency_p50_ms": 145,
-    "tokens_per_sec": 85
-  }
-}
-```
+We use **HQQ (Half-Quadratic Quantization)** via HuggingFace Transformers with:
 
-**CSV-Aggregation** (`results/master_results.csv`):
-```csv
-experiment_id,model,kv_bits,context_len,accuracy,vram_gb,latency_ms
-mistral7b_fp16,Mistral-7B,16,16384,0.70,24.3,180
-mistral7b_int8,Mistral-7B,8,16384,0.68,18.5,145
-```
+- **INT8**: Group Size 64, Axis 0
+- **INT4**: Group Size 64, Axis 0  
+- **INT2**: Group Size 16, Axis 0
+- **Residual Length**: 128 tokens (last 128 tokens remain in FP16)
 
 ---
 
-## 📈 Visualisierung
+## Results Summary
 
-**Paper-Quality Plots** (generiert in `results/figures/`):
-- `pareto_accuracy_vram.pdf` – Pareto-Front (16/8/4/2-Bit)
-- `vram_scaling.pdf` – VRAM vs. Context-Length
-- `layer_sensitivity.pdf` – Heatmap (Layer × Quantization)
-- `throughput_latency.pdf` – Scatter (Bitwidth)
+### Memory Reduction
 
-**Generierung**:
-```bash
-python scripts/plot_pareto_final.py
-python scripts/plot_vram_scaling.py
-python scripts/plot_layer_sensitivity.py
-```
+| Bitwidth | KV-Cache Size | Reduction |
+|----------|---------------|-----------|
+| FP16 | 100% (baseline) | — |
+| INT8 | 50% | 2× compression |
+| INT4 | 25% | 4× compression |
+| INT2 | 12.5% | 8× compression |
 
----
+### Practical Recommendations
 
-## 🧪 Reproduzierbarkeit
-
-### **Seeds fixieren**
-Alle Skripte nutzen feste Seeds:
-```python
-torch.manual_seed(42)
-np.random.seed(42)
-torch.cuda.manual_seed_all(42)
-```
-
-### **Exakte Versionen**
-`requirements.txt` pinned Versions:
-```
-torch==2.1.0+cu121
-transformers==4.35.0
-pynvml==11.5.0
-...
-```
-
-### **Hardware-Info loggen**
-Jedes Experiment speichert:
-- GPU-Modell (via `pynvml`)
-- CUDA/cuDNN-Version
-- Driver-Version
+- **INT8**: Universally safe (<1% PPL degradation)
+- **INT4**: Requires model-specific validation
+- **INT2**: Only for robust models (Mistral-7B, Yi-1.5-9B)
 
 ---
 
-## 📚 Dokumentation
+## Citation
 
-- **Experiments**: `experiments/week*.md` – Wöchentliche Logs mit Plots & Erkenntnissen
-- **Profiling-Guide**: `docs/profiling_guide.md` – VRAM/Latenz/Throughput messen
-- **Quantization-HowTo**: `docs/quantization_howto.md` – INT8/INT4/INT2 implementieren
-
----
-
-## 🔗 Related Repositories
-
-- **Dokumentation/Recherche** (privat): Literatur, Glossar, Exposé im parallelen Repo
-- **KIVI** (Referenz): https://github.com/jy-yuan/KIVI
-- **lm-evaluation-harness**: https://github.com/EleutherAI/lm-evaluation-harness
-
----
-
-## 📝 Zitation
-
-Falls du diesen Code nutzt, bitte referenziere:
+If you use this code or data, please cite the thesis:
 
 ```bibtex
-@mastersthesis{behr2025kvcache,
-  title={Long-Context-Effizienz durch KV-Cache-Quantisierung},
-  author={Behr, Lennart},
-  year={2025},
-  school={Berliner Hochschule für Technik (BHT)}
+@mastersthesis{behr2026kvcache,
+  author = {Behr, Lennart},
+  title = {Long-Context-Effizienz durch KV-Cache-Quantisierung bei Large Language Models},
+  school = {Berliner Hochschule für Technik},
+  year = {2026},
+  type = {Master's Thesis}
 }
 ```
 
 ---
 
-## 📄 Lizenz
+## License
 
-MIT License (oder nach Absprache mit Betreuer)
-
----
-
-**Status**: Week 0 abgeschlossen (Exposé), Week 1-2 aktiv (nanoGPT Setup)  
-**Letzte Aktualisierung**: 2025-10-24
+MIT License. See individual model licenses for usage restrictions.
