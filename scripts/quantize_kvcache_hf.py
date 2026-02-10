@@ -25,6 +25,7 @@ import json
 import os
 import sys
 import time
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List
@@ -34,6 +35,120 @@ import torch
 import transformers
 from transformers import AutoModelForCausalLM, AutoTokenizer, QuantizedCache, DynamicCache
 from tqdm import tqdm
+
+
+# =============================================================================
+# Quantization Timing Infrastructure (from profile_quant_overhead.py)
+# =============================================================================
+
+@dataclass
+class QuantizationTimings:
+    """Sammelt Timing-Daten für Quantisierungs-Operationen."""
+    quantize_times_ms: List[float] = field(default_factory=list)
+    dequantize_times_ms: List[float] = field(default_factory=list)
+    
+    def add_quantize(self, ms: float):
+        self.quantize_times_ms.append(ms)
+    
+    def add_dequantize(self, ms: float):
+        self.dequantize_times_ms.append(ms)
+    
+    def summary(self) -> Dict:
+        q_total = sum(self.quantize_times_ms)
+        dq_total = sum(self.dequantize_times_ms)
+        return {
+            "quantize_total_ms": round(q_total, 3),
+            "quantize_calls": len(self.quantize_times_ms),
+            "dequantize_total_ms": round(dq_total, 3),
+            "dequantize_calls": len(self.dequantize_times_ms),
+            "total_overhead_ms": round(q_total + dq_total, 3),
+        }
+    
+    def reset(self):
+        self.quantize_times_ms.clear()
+        self.dequantize_times_ms.clear()
+
+
+# Global timing collector
+_timings = QuantizationTimings()
+_patches_applied = False
+
+
+def reset_timings():
+    """Reset timing data for new measurement."""
+    _timings.reset()
+
+
+def get_timings() -> QuantizationTimings:
+    """Get the global timings object."""
+    return _timings
+
+
+def patch_quantized_cache():
+    """
+    Monkey-patch HuggingFace QuantizedCache to measure quantization/dequantization timing.
+    
+    This patches QuantoQuantizedLayer and HQQQuantizedLayer to wrap their
+    _quantize and _dequantize methods with timing instrumentation.
+    """
+    global _patches_applied
+    if _patches_applied:
+        return  # Only apply once
+    
+    try:
+        from transformers.cache_utils import QuantoQuantizedLayer, HQQQuantizedLayer
+    except ImportError:
+        print("⚠ Warning: Could not import QuantizedLayer classes - overhead timing disabled")
+        return
+    
+    # Patch QuantoQuantizedLayer
+    original_quanto_quantize = QuantoQuantizedLayer._quantize
+    original_quanto_dequantize = QuantoQuantizedLayer._dequantize
+    
+    def timed_quanto_quantize(self, tensor, axis):
+        torch.cuda.synchronize()
+        start = time.perf_counter()
+        result = original_quanto_quantize(self, tensor, axis)
+        torch.cuda.synchronize()
+        _timings.add_quantize((time.perf_counter() - start) * 1000)
+        return result
+    
+    def timed_quanto_dequantize(self, qtensor):
+        torch.cuda.synchronize()
+        start = time.perf_counter()
+        result = original_quanto_dequantize(self, qtensor)
+        torch.cuda.synchronize()
+        _timings.add_dequantize((time.perf_counter() - start) * 1000)
+        return result
+    
+    QuantoQuantizedLayer._quantize = timed_quanto_quantize
+    QuantoQuantizedLayer._dequantize = timed_quanto_dequantize
+    
+    # Patch HQQQuantizedLayer
+    original_hqq_quantize = HQQQuantizedLayer._quantize
+    original_hqq_dequantize = HQQQuantizedLayer._dequantize
+    
+    def timed_hqq_quantize(self, tensor, axis):
+        torch.cuda.synchronize()
+        start = time.perf_counter()
+        result = original_hqq_quantize(self, tensor, axis)
+        torch.cuda.synchronize()
+        _timings.add_quantize((time.perf_counter() - start) * 1000)
+        return result
+    
+    def timed_hqq_dequantize(self, qtensor):
+        torch.cuda.synchronize()
+        start = time.perf_counter()
+        result = original_hqq_dequantize(self, qtensor)
+        torch.cuda.synchronize()
+        _timings.add_dequantize((time.perf_counter() - start) * 1000)
+        return result
+    
+    HQQQuantizedLayer._quantize = timed_hqq_quantize
+    HQQQuantizedLayer._dequantize = timed_hqq_dequantize
+    
+    _patches_applied = True
+    print("✅ QuantizedCache timing patches applied")
 
 
 class VRAMProfiler:
@@ -177,6 +292,10 @@ def run_experiment(
 ) -> Dict:
     """Führt Experiment aus: lädt Model, generiert bei verschiedenen Context-Längen, misst."""
     
+    # Apply timing patches BEFORE any quantized cache operations
+    if quantize:
+        patch_quantized_cache()
+    
     # Set seeds
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
@@ -251,8 +370,9 @@ def run_experiment(
             # Standard DynamicCache (FP16)
             past_key_values = DynamicCache()
         
-        # Clear CUDA cache
+        # Clear CUDA cache and reset timing counters
         torch.cuda.empty_cache()
+        reset_timings()  # Clear timing data for fresh measurement
         vram_start = profiler.get_vram_usage()
         
         # Forward pass with timing (builds KV cache)
@@ -293,10 +413,15 @@ def run_experiment(
         tokens_per_sec = (tokens_generated / total_ms) * 1000 if total_ms > 0 else 0.0
         kv_cache_mb = kv_size['total_gb'] * 1024
         
-        # For quantized runs, estimate overhead (0% for FP16 baseline)
-        if quantize and nbits < 16:
-            # Conservative estimate: quantization adds ~5-10% overhead
-            overhead_pct = 7.5
+        # Get timing data from instrumented quantization layers
+        timing_summary = get_timings().summary()
+        quant_ms = timing_summary['quantize_total_ms']
+        dequant_ms = timing_summary['dequantize_total_ms']
+        total_overhead_ms = timing_summary['total_overhead_ms']
+        
+        # Compute overhead as percentage of total time
+        if total_ms > 0:
+            overhead_pct = (total_overhead_ms / total_ms) * 100
         else:
             overhead_pct = 0.0
         
@@ -314,8 +439,8 @@ def run_experiment(
             'tokens_per_sec': round(tokens_per_sec, 2),
             'kv_cache_mb': round(kv_cache_mb, 2),
             'perplexity': round(ppl, 4),
-            'quant_ms': 0.0,  # Not measured separately in this script
-            'dequant_ms': 0.0,  # Not measured separately in this script
+            'quant_ms': round(quant_ms, 3),
+            'dequant_ms': round(dequant_ms, 3),
             'overhead_pct': round(overhead_pct, 2),
             'avg_watts': 0.0,  # Power measurement not implemented
             'energy_mj_per_token': 0.0  # Derived from power, not measured

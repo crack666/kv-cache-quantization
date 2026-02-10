@@ -133,7 +133,7 @@ def save_latex_table(df: pd.DataFrame, output_dir: Path, context_filter: int = N
     df_export = df_export.sort_values(['Model', 'Context', 'Config'], kind='mergesort')
     
     # Rename column for LaTeX compatibility (replace Unicode Δ with \Delta command)
-    df_export.rename(columns={'ΔPPL (%)': r'$\Delta$PPL (\%)', 'Overhead (%)': r'Overhead (\%)'}, inplace=True)
+    df_export.rename(columns={'ΔPPL (%)': r'$\Delta$PPL (\%)'}, inplace=True)
     
     # Format columns for LaTeX
     df_export['Throughput (tok/s)'] = df_export['Throughput (tok/s)'].apply(lambda x: f"{x:.1f}")
@@ -160,13 +160,17 @@ def save_latex_table(df: pd.DataFrame, output_dir: Path, context_filter: int = N
         return f"{x:+.1f}"
     df_export[r'$\Delta$PPL (\%)'] = df_export[r'$\Delta$PPL (\%)'].apply(format_delta_ppl)
     
-    df_export[r'Overhead (\%)'] = df_export[r'Overhead (\%)'].apply(lambda x: f"{x:.1f}")
+    # Format Overhead column (negative values indicate "not measured")
+    df_export['Overhead (%)'] = df_export['Overhead (%)'].apply(lambda x: f"{x:.1f}" if x >= 0 else "--")
+    
+    # Rename Overhead column for LaTeX escaping
+    df_export.rename(columns={'Overhead (%)': r'Overhead (\%)'}, inplace=True)
     
     # Generate LaTeX with longtable for multi-page support in landscape
-    # Use p{width} columns for text fields and right-aligned p{} for last two cols
+    # Use p{width} columns for text fields and right-aligned p{} for last col
     latex = df_export.to_latex(
         index=False,
-        column_format=r'|p{2.2cm}|p{2.5cm}|r|r|r|r|>{\raggedleft\arraybackslash}p{1.3cm}|>{\raggedleft\arraybackslash}p{1.3cm}|',
+        column_format=r'|p{2.0cm}|p{2.3cm}|r|r|r|r|r|>{\raggedleft\arraybackslash}p{1.3cm}|',
         escape=False,
         longtable=True,  # Use longtable for landscape compatibility
         caption='Vollständige KV-Cache Profiling-Ergebnisse (alle Kontexte)',
