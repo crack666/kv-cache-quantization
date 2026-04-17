@@ -102,37 +102,12 @@ SUPPORTED_MODELS = {
         'gqa_ratio': '4:1',
         'kv_heads': 8,
     },
-    # === WisSem / MA CANDIDATES ===
-    'mistralai/Mistral-7B-v0.3': {
-        'vram_gb': 14.0,
-        'max_context': 32768,
-        'description': 'Mistral 7B v0.3 - Continuity with WisPro baseline',
-        'role': 'primary',
-        'gqa_ratio': '4:1',
-        'kv_heads': 8,
-    },
-    'Qwen/Qwen3-8B': {
-        'vram_gb': 16.0,
-        'max_context': 32768,
-        'description': 'Qwen3 8B - GPT-4 competitive MMLU, good HF integration',
-        'role': 'primary',
-        'gqa_ratio': '4:1',
-        'kv_heads': 8,
-    },
-    'google/gemma-4-e4b-it': {
-        'vram_gb': 16.0,
-        'max_context': 131072,
-        'description': 'Gemma 4 E4B - Hybrid attention (sliding+full), PLE, KV-sharing',
-        'role': 'primary',
-        'gqa_ratio': '4:1',
-        'kv_heads': 2,
-    },
 }
 
 SUPPORTED_METHODS = {
     'baseline': {
         'description': 'Standard HuggingFace QuantizedCache (quanto/hqq)',
-        'script': 'profiler_suite.py',  # Updated: was quantize_kvcache_hf.py
+        'script': 'quantize_kvcache_hf.py',
         'backends': ['none', 'quanto', 'hqq'],  # 'none' = FP16 baseline
         'nbits': {'none': [16], 'quanto': [4], 'hqq': [4, 8]},  # Skip INT2 (too aggressive), quanto INT8 broken
     },
