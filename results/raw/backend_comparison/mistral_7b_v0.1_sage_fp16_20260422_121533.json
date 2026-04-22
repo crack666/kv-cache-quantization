@@ -1,0 +1,109 @@
+{
+  "schema_version": "2.0",
+  "experiment_id": "mistral_7b_v0.1_sage_fp16_20260422_121533",
+  "timestamp": "2026-04-22T12:15:33",
+  "model": "mistralai/Mistral-7B-v0.1",
+  "model_config": {
+    "num_params_b": 7.24,
+    "num_layers": 32,
+    "num_q_heads": 32,
+    "num_kv_heads": 8,
+    "gqa_ratio": "4:1",
+    "head_dim": 128,
+    "max_position_embeddings": 32768
+  },
+  "attn_backend": "sage",
+  "kv_quant": {
+    "enabled": false,
+    "nbits": null,
+    "backend": null
+  },
+  "environment": {
+    "python_version": "3.12.3",
+    "pytorch_version": "2.8.0+cu128",
+    "transformers_version": "4.57.3",
+    "cuda_version": "12.8",
+    "gpu_name": "NVIDIA GeForce RTX 5090",
+    "gpu_vram_gb": 34.2
+  },
+  "config": {
+    "seed": 42,
+    "warmup_runs": 2,
+    "measure_runs": 5,
+    "decode_tokens": 128,
+    "ppl_dataset": "wikitext2",
+    "ppl_tokens": 4096
+  },
+  "measurements": [
+    {
+      "context_len": 512,
+      "prefill_ms": 82.536,
+      "prefill_tokens_per_sec": 6203.35,
+      "decode_ms": 3397.521,
+      "decode_tokens": 128,
+      "decode_tokens_per_sec": 37.67,
+      "vram_peak_mb": 14070.9,
+      "kv_cache_mb": 64.0,
+      "kv_cache_type": "DynamicCache (FP16)",
+      "quant_overhead_ms": 0,
+      "dequant_overhead_ms": 0,
+      "overhead_pct": 0.0,
+      "avg_power_watts": 0.0,
+      "energy_mj_per_token": 0.0,
+      "ctx_elapsed_s": 10.2
+    },
+    {
+      "context_len": 1024,
+      "prefill_ms": 88.459,
+      "prefill_tokens_per_sec": 11576.0,
+      "decode_ms": 3193.273,
+      "decode_tokens": 128,
+      "decode_tokens_per_sec": 40.08,
+      "vram_peak_mb": 14321.1,
+      "kv_cache_mb": 128.0,
+      "kv_cache_type": "DynamicCache (FP16)",
+      "quant_overhead_ms": 0,
+      "dequant_overhead_ms": 0,
+      "overhead_pct": 0.0,
+      "avg_power_watts": 0.0,
+      "energy_mj_per_token": 0.0,
+      "ctx_elapsed_s": 11.2
+    },
+    {
+      "context_len": 4096,
+      "prefill_ms": 351.555,
+      "prefill_tokens_per_sec": 11651.1,
+      "decode_ms": 3649.806,
+      "decode_tokens": 128,
+      "decode_tokens_per_sec": 35.07,
+      "vram_peak_mb": 15838.7,
+      "kv_cache_mb": 512.0,
+      "kv_cache_type": "DynamicCache (FP16)",
+      "quant_overhead_ms": 0,
+      "dequant_overhead_ms": 0,
+      "overhead_pct": 0.0,
+      "avg_power_watts": 0.0,
+      "energy_mj_per_token": 0.0,
+      "ctx_elapsed_s": 11.9
+    },
+    {
+      "context_len": 8192,
+      "prefill_ms": 720.337,
+      "prefill_tokens_per_sec": 11372.45,
+      "decode_ms": 5009.776,
+      "decode_tokens": 128,
+      "decode_tokens_per_sec": 25.55,
+      "vram_peak_mb": 17888.8,
+      "kv_cache_mb": 1024.0,
+      "kv_cache_type": "DynamicCache (FP16)",
+      "quant_overhead_ms": 0,
+      "dequant_overhead_ms": 0,
+      "overhead_pct": 0.0,
+      "avg_power_watts": 0.0,
+      "energy_mj_per_token": 0.0,
+      "ctx_elapsed_s": 17.2
+    }
+  ],
+  "benchmarks": {},
+  "combo_elapsed_s": 57.4
+}

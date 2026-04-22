@@ -1,0 +1,49 @@
+{
+  "model": "mistralai/Mistral-7B-v0.1",
+  "timestamp": "2026-04-22T12:15:33",
+  "total_runtime_s": 1071.3,
+  "combinations": [
+    {
+      "backend": "sdpa",
+      "kv_quant": "fp16",
+      "ctx": 8192,
+      "prefill_ms": 1103.205,
+      "decode_tok_s": 21.51,
+      "kv_mb": 1024.0,
+      "vram_peak_mb": 17888.8,
+      "ppl": null,
+      "ppl_quant": null,
+      "ppl_delta": null,
+      "combo_elapsed_s": 59.5,
+      "json_file": "mistral_7b_v0.1_sdpa_fp16_20260422_115841.json"
+    },
+    {
+      "backend": "eager",
+      "kv_quant": "fp16",
+      "ctx": 8192,
+      "prefill_ms": 84519.445,
+      "decode_tok_s": 0.58,
+      "kv_mb": 1024.0,
+      "vram_peak_mb": 33792.8,
+      "ppl": null,
+      "ppl_quant": null,
+      "ppl_delta": null,
+      "combo_elapsed_s": 953.9,
+      "json_file": "mistral_7b_v0.1_eager_fp16_20260422_121435.json"
+    },
+    {
+      "backend": "sage",
+      "kv_quant": "fp16",
+      "ctx": 8192,
+      "prefill_ms": 720.337,
+      "decode_tok_s": 25.55,
+      "kv_mb": 1024.0,
+      "vram_peak_mb": 17888.8,
+      "ppl": null,
+      "ppl_quant": null,
+      "ppl_delta": null,
+      "combo_elapsed_s": 57.4,
+      "json_file": "mistral_7b_v0.1_sage_fp16_20260422_121533.json"
+    }
+  ]
+}

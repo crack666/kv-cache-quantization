@@ -1,0 +1,115 @@
+{
+  "schema_version": "2.0",
+  "experiment_id": "mistral_7b_v0.1_sdpa_int4_hqq_20260417_031848",
+  "timestamp": "2026-04-17T03:18:48",
+  "model": "mistralai/Mistral-7B-v0.1",
+  "model_config": {
+    "num_params_b": 7.24,
+    "num_layers": 32,
+    "num_q_heads": 32,
+    "num_kv_heads": 8,
+    "gqa_ratio": "4:1",
+    "head_dim": 128,
+    "max_position_embeddings": 32768
+  },
+  "attn_backend": "sdpa",
+  "kv_quant": {
+    "enabled": true,
+    "nbits": 4,
+    "backend": "hqq"
+  },
+  "environment": {
+    "python_version": "3.12.3",
+    "pytorch_version": "2.8.0+cu128",
+    "transformers_version": "4.57.3",
+    "cuda_version": "12.8",
+    "gpu_name": "NVIDIA GeForce RTX 5090",
+    "gpu_vram_gb": 34.2
+  },
+  "config": {
+    "seed": 42,
+    "warmup_runs": 2,
+    "measure_runs": 5,
+    "decode_tokens": 128,
+    "ppl_dataset": "wikitext2",
+    "ppl_tokens": 16384
+  },
+  "measurements": [
+    {
+      "context_len": 512,
+      "prefill_ms": 525.81,
+      "prefill_tokens_per_sec": 973.73,
+      "decode_ms": 4588.044,
+      "decode_tokens": 128,
+      "decode_tokens_per_sec": 27.9,
+      "vram_peak_mb": 13932.9,
+      "kv_cache_mb": 18.0,
+      "kv_cache_type": "QuantizedCache (INT4)",
+      "quant_overhead_ms": 3785.948,
+      "dequant_overhead_ms": 2649.881,
+      "overhead_pct": 125.85,
+      "avg_power_watts": 0.0,
+      "energy_mj_per_token": 0.0
+    },
+    {
+      "context_len": 1024,
+      "prefill_ms": 436.128,
+      "prefill_tokens_per_sec": 2347.94,
+      "decode_ms": 4555.203,
+      "decode_tokens": 128,
+      "decode_tokens_per_sec": 28.1,
+      "vram_peak_mb": 14045.1,
+      "kv_cache_mb": 36.0,
+      "kv_cache_type": "QuantizedCache (INT4)",
+      "quant_overhead_ms": 3133.451,
+      "dequant_overhead_ms": 2692.133,
+      "overhead_pct": 116.71,
+      "avg_power_watts": 0.0,
+      "energy_mj_per_token": 0.0
+    },
+    {
+      "context_len": 4096,
+      "prefill_ms": 798.109,
+      "prefill_tokens_per_sec": 5132.13,
+      "decode_ms": 5860.707,
+      "decode_tokens": 128,
+      "decode_tokens_per_sec": 21.84,
+      "vram_peak_mb": 14734.7,
+      "kv_cache_mb": 144.0,
+      "kv_cache_type": "QuantizedCache (INT4)",
+      "quant_overhead_ms": 2998.59,
+      "dequant_overhead_ms": 3058.102,
+      "overhead_pct": 90.96,
+      "avg_power_watts": 0.0,
+      "energy_mj_per_token": 0.0
+    },
+    {
+      "context_len": 8192,
+      "prefill_ms": 1530.679,
+      "prefill_tokens_per_sec": 5351.87,
+      "decode_ms": 8078.968,
+      "decode_tokens": 128,
+      "decode_tokens_per_sec": 15.84,
+      "vram_peak_mb": 15680.8,
+      "kv_cache_mb": 288.0,
+      "kv_cache_type": "QuantizedCache (INT4)",
+      "quant_overhead_ms": 3742.604,
+      "dequant_overhead_ms": 3431.021,
+      "overhead_pct": 74.65,
+      "avg_power_watts": 0.0,
+      "energy_mj_per_token": 0.0
+    }
+  ],
+  "benchmarks": {
+    "perplexity": {
+      "dataset": "wikitext2",
+      "tokens": 16384,
+      "value": 4.676
+    },
+    "perplexity_quantized": {
+      "dataset": "wikitext2",
+      "tokens": 16384,
+      "value": 4.6772
+    }
+  }
+}

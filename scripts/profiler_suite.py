@@ -103,6 +103,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     # Output
     p.add_argument("--output-dir", default="results/raw/", help="Output directory for JSON v2 files")
+    p.add_argument("--summary-file", default=None,
+                   help="Path for a compact JSON summary of all combinations (agent-friendly)")
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--device", default="cuda", choices=["cuda", "cpu"])
 
@@ -121,6 +123,7 @@ def run_single_combination(
     args,
 ) -> dict:
     """Profile one (attn_backend, kv_quant) combination across all context lengths."""
+    combo_t0 = time.time()
 
     torch.manual_seed(args.seed)
     if torch.cuda.is_available():
@@ -128,8 +131,10 @@ def run_single_combination(
 
     # VRAM profiler — init BEFORE model loading to capture model VRAM
     profiler = None
+    vram_total_mb = 0.0
     if args.device == "cuda":
         profiler = VRAMProfiler()
+        vram_total_mb = torch.cuda.get_device_properties(0).total_mem / (1024 * 1024)
 
     # Load model
     model, tokenizer, info = load_model(
@@ -231,10 +236,16 @@ def run_single_combination(
             prefill_fn=_re_prefill,
         )
 
-        # VRAM peak
+        # VRAM peak + overflow detection
         vram_peak_mb = 0.0
+        vram_overflow = False
         if args.device == "cuda":
             vram_peak_mb = torch.cuda.max_memory_allocated() / (1024 * 1024)
+            if vram_total_mb > 0 and vram_peak_mb > vram_total_mb:
+                vram_overflow = True
+                overflow_mb = vram_peak_mb - vram_total_mb
+                print(f"  ⚠ VRAM OVERFLOW: peak {vram_peak_mb:.0f} MB > physical {vram_total_mb:.0f} MB "
+                      f"(+{overflow_mb:.0f} MB spilled to system RAM via PCIe — results may be unreliable)")
 
         # Power
         power_stats = {"avg_watts": 0.0}
@@ -271,10 +282,15 @@ def run_single_combination(
             "overhead_pct": round(overhead_pct, 2),
             "avg_power_watts": round(power_stats["avg_watts"], 1),
             "energy_mj_per_token": round(energy_mj, 2),
+            "ctx_elapsed_s": round(time.time() - ctx_t0, 1),
+            "vram_overflow": vram_overflow,
         }
         measurements.append(m)
         ctx_elapsed = time.time() - ctx_t0
-        print(f"  Prefill: {m['prefill_ms']:.1f}ms | Decode: {m['decode_tokens_per_sec']:.1f} tok/s ({m['decode_ms']:.0f}ms / {m['decode_tokens']}tok) | KV: {m['kv_cache_mb']:.1f}MB | VRAM peak: {m['vram_peak_mb']:.0f}MB | ctx time: {ctx_elapsed:.1f}s")
+        print(f"  Prefill: {m['prefill_ms']:.1f}ms ({m['prefill_tokens_per_sec']:.0f} tok/s)"
+              f" | Decode: {m['decode_ms']:.0f}ms total, {m['decode_tokens_per_sec']:.1f} tok/s ({m['decode_tokens']} new tokens)"
+              f" | KV: {m['kv_cache_mb']:.1f}MB | VRAM peak: {m['vram_peak_mb']:.0f}MB"
+              f" | wall: {ctx_elapsed:.1f}s")
 
         # Free cache for next iteration
         del filled_cache, cache
@@ -352,6 +368,8 @@ def run_single_combination(
     quant_tag = kv_quant.replace("-", "_") if kv_quant != "none" else "fp16"
     experiment_id = f"{model_short}_{attn_backend}_{quant_tag}_{timestamp.strftime('%Y%m%d_%H%M%S')}"
 
+    combo_elapsed_s = round(time.time() - combo_t0, 1)
+
     result = {
         "schema_version": "2.0",
         "experiment_id": experiment_id,
@@ -361,6 +379,10 @@ def run_single_combination(
         "attn_backend": attn_backend,
         "kv_quant": kv_cfg,
         "environment": info["environment"],
+        "hardware": {
+            "vram_total_mb": round(vram_total_mb, 1),
+            "gpu_name": torch.cuda.get_device_properties(0).name if args.device == "cuda" else "n/a",
+        },
         "config": {
             "seed": args.seed,
             "warmup_runs": args.warmup_runs,
@@ -371,6 +393,7 @@ def run_single_combination(
         },
         "measurements": measurements,
         "benchmarks": benchmarks,
+        "combo_elapsed_s": combo_elapsed_s,
     }
 
     # Save
@@ -382,10 +405,13 @@ def run_single_combination(
     print(f"\nSaved: {out_path}")
 
     # Cleanup
+    cleanup_fn = info.get("_cleanup_fn")
     del model, tokenizer
     gc.collect()
     if args.device == "cuda":
         torch.cuda.empty_cache()
+    if cleanup_fn:
+        cleanup_fn()
 
     return result
 
@@ -422,6 +448,14 @@ def main():
                 args.model, backend, quant, args.context_lengths, args
             )
             results.append(r)
+
+            # Running ETA
+            elapsed = time.time() - suite_start
+            avg_per_combo = elapsed / idx
+            remaining = avg_per_combo * (total - idx)
+            rem_min, rem_sec = divmod(remaining, 60)
+            print(f"  [{idx}/{total}] combo took {r['combo_elapsed_s']:.0f}s | "
+                  f"elapsed {elapsed:.0f}s | ETA ~{int(rem_min)}m{rem_sec:.0f}s")
         except torch.cuda.OutOfMemoryError:
             print(f"  OOM — skipping {backend}/{quant}")
             gc.collect()
@@ -433,10 +467,73 @@ def main():
 
     suite_elapsed = time.time() - suite_start
     suite_min, suite_sec = divmod(suite_elapsed, 60)
+
+    # ── Compact summary table (agent-friendly) ───────────────────────────
+    summary_rows = []
+    for r in results:
+        # Extract key metrics from the last (longest) context measurement
+        last_m = r["measurements"][-1] if r["measurements"] else {}
+        ppl_ref = r.get("benchmarks", {}).get("perplexity", {}).get("value")
+        ppl_quant = r.get("benchmarks", {}).get("perplexity_quantized", {}).get("value")
+        ppl_delta = round(ppl_quant - ppl_ref, 4) if ppl_ref and ppl_quant else None
+
+        row = {
+            "backend": r["attn_backend"],
+            "kv_quant": "fp16" if not r["kv_quant"]["enabled"] else f"int{r['kv_quant']['nbits']}-{r['kv_quant']['backend']}",
+            "ctx": last_m.get("context_len", "?"),
+            "prefill_ms": last_m.get("prefill_ms"),
+            "decode_tok_s": last_m.get("decode_tokens_per_sec"),
+            "kv_mb": last_m.get("kv_cache_mb"),
+            "vram_peak_mb": last_m.get("vram_peak_mb"),
+            "vram_overflow": any(m.get("vram_overflow", False) for m in r["measurements"]),
+            "ppl": ppl_ref,
+            "ppl_quant": ppl_quant,
+            "ppl_delta": ppl_delta,
+            "combo_elapsed_s": r.get("combo_elapsed_s", 0),
+            "json_file": r["experiment_id"] + ".json",
+        }
+        summary_rows.append(row)
+
+    # Print summary table
     print(f"\n{'='*80}")
-    print(f"Done. {len(results)}/{total} combinations completed.")
-    print(f"Total runtime: {int(suite_min)}m {suite_sec:.1f}s")
+    print(f"SUMMARY — {len(results)}/{total} combinations | {int(suite_min)}m {suite_sec:.1f}s")
     print(f"{'='*80}")
+    # Header
+    header = f"{'Backend':<8} {'KV-Quant':<14} {'Ctx':>5} {'Prefill':>9} {'Decode':>10} {'KV':>8} {'VRAM':>8} {'PPL':>8} {'Δ-PPL':>8} {'Time':>6}"
+    print(header)
+    print("-" * len(header))
+    for row in summary_rows:
+        ppl_str = f"{row['ppl']:.4f}" if row['ppl'] else "n/a"
+        delta_str = f"{row['ppl_delta']:+.4f}" if row['ppl_delta'] is not None else "—"
+        time_str = f"{row['combo_elapsed_s']:.0f}s"
+        overflow_marker = " ⚠️" if row.get("vram_overflow") else ""
+        print(
+            f"{row['backend']:<8} {row['kv_quant']:<14} {row['ctx']:>5} "
+            f"{row['prefill_ms']:>8.1f}ms {row['decode_tok_s']:>8.1f}t/s "
+            f"{row['kv_mb']:>7.0f}MB {row['vram_peak_mb']:>7.0f}MB "
+            f"{ppl_str:>8} {delta_str:>8} {time_str:>6}{overflow_marker}"
+        )
+    print(f"{'='*80}")
+
+    # Write summary file if requested
+    if args.summary_file:
+        summary_path = Path(args.summary_file)
+        # Avoid overwriting: insert timestamp before extension if file exists
+        if summary_path.exists():
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+            summary_path = summary_path.with_stem(f"{summary_path.stem}_{ts}")
+        summary_path.parent.mkdir(parents=True, exist_ok=True)
+        summary = {
+            "model": args.model,
+            "timestamp": datetime.now().isoformat(timespec="seconds"),
+            "total_runtime_s": round(suite_elapsed, 1),
+            "combinations": summary_rows,
+        }
+        with open(summary_path, "w") as f:
+            json.dump(summary, f, indent=2)
+        print(f"Summary: {summary_path}")
+
+    print(f"Done. {len(results)}/{total} combinations completed.")
 
 
 if __name__ == "__main__":

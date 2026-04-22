@@ -144,8 +144,9 @@ def load_model(
 
     # Resolve attention implementation string
     attn_impl = attn_backend
+    cleanup_fn = None
     if attn_backend == "sage":
-        attn_impl, _ = _resolve_sage()
+        attn_impl, cleanup_fn = _resolve_sage()
 
     # Load tokenizer
     tokenizer = AutoTokenizer.from_pretrained(model_id)
@@ -169,6 +170,7 @@ def load_model(
         "environment": _collect_environment(),
         "attn_backend": attn_backend,
         "kv_quant": kv_cfg,
+        "_cleanup_fn": cleanup_fn,
     }
 
     print(
