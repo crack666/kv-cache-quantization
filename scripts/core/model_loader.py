@@ -17,7 +17,7 @@ from typing import Dict, Optional, Tuple
 
 import torch
 import transformers
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 
 
 # Supported attention backends — extend as new integrations land
@@ -74,9 +74,16 @@ def _parse_kv_quant(kv_quant: str) -> Dict:
     return {"enabled": True, "nbits": nbits, "backend": backend}
 
 
+def _get_text_config(model_config):
+    """Return the text-specific config, handling multimodal models with nested configs."""
+    if hasattr(model_config, "text_config"):
+        return model_config.text_config
+    return model_config
+
+
 def _collect_model_config(model) -> Dict:
     """Extract architecture metadata for JSON output."""
-    cfg = model.config
+    cfg = _get_text_config(model.config)
     num_q_heads = getattr(cfg, "num_attention_heads", None)
     num_kv_heads = getattr(cfg, "num_key_value_heads", num_q_heads)
     head_dim = getattr(cfg, "head_dim", None)
@@ -148,28 +155,42 @@ def load_model(
     if attn_backend == "sage":
         attn_impl, cleanup_fn = _resolve_sage()
 
+    # Detect model type — multimodal models need a different Auto class
+    auto_config = AutoConfig.from_pretrained(model_id)
+    is_multimodal = hasattr(auto_config, "text_config")
+
     # Load tokenizer
     tokenizer = AutoTokenizer.from_pretrained(model_id)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
-    # Load model
-    model = AutoModelForCausalLM.from_pretrained(
-        model_id,
+    # Load model — use appropriate class for multimodal vs causal-only
+    model_kwargs = dict(
         dtype=dtype,
         device_map=device if device != "cpu" else None,
         attn_implementation=attn_impl,
         low_cpu_mem_usage=True,
     )
+    if is_multimodal:
+        from transformers import AutoModelForImageTextToText
+        model = AutoModelForImageTextToText.from_pretrained(model_id, **model_kwargs)
+        print(f"  Multimodal model detected ({auto_config.model_type}) — loaded via AutoModelForImageTextToText")
+    else:
+        model = AutoModelForCausalLM.from_pretrained(model_id, **model_kwargs)
     if device == "cpu":
         model = model.to(device)
     model.eval()
+
+    # For multimodal models, provide the text sub-config for cache creation
+    text_config = _get_text_config(model.config)
 
     info = {
         "model_config": _collect_model_config(model),
         "environment": _collect_environment(),
         "attn_backend": attn_backend,
         "kv_quant": kv_cfg,
+        "text_config": text_config,
+        "is_multimodal": is_multimodal,
         "_cleanup_fn": cleanup_fn,
     }
 

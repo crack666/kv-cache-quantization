@@ -1,0 +1,22 @@
+{
+  "model": "google/gemma-4-E4B",
+  "timestamp": "2026-04-22T14:13:25",
+  "total_runtime_s": 545.6,
+  "combinations": [
+    {
+      "backend": "sdpa",
+      "kv_quant": "fp16",
+      "ctx": 8192,
+      "prefill_ms": 8913.93,
+      "decode_tok_s": 6.49,
+      "kv_mb": 448.0,
+      "vram_peak_mb": 24731.1,
+      "vram_overflow": false,
+      "ppl": 7.6494,
+      "ppl_quant": null,
+      "ppl_delta": null,
+      "combo_elapsed_s": 536.3,
+      "json_file": "gemma_4_e4b_sdpa_fp16_20260422_141316.json"
+    }
+  ]
+}

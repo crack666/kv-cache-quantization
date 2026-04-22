@@ -23,7 +23,7 @@ from pathlib import Path
 import torch
 import numpy as np
 from datasets import load_dataset
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -41,11 +41,15 @@ class KVCaptureHook:
     def _register(self, model):
         """Find attention layers and register hooks."""
         for name, module in model.named_modules():
-            # Match common attention module names across architectures
+            # Match text-backbone attention module names across architectures
             # Mistral/Llama: model.layers.X.self_attn
             # Qwen2: model.layers.X.self_attn
-            if name.endswith(".self_attn"):
-                layer_idx = int(name.split(".")[-2])
+            # Gemma4: model.language_model.model.layers.X.self_attn
+            # Skip vision/audio towers for multimodal models
+            if name.endswith(".self_attn") and "vision" not in name and "audio" not in name:
+                # Extract layer index from second-to-last dot-separated component
+                parts = name.split(".")
+                layer_idx = int(parts[-2])
                 hook = module.register_forward_hook(
                     self._make_hook(layer_idx)
                 )
@@ -54,7 +58,7 @@ class KVCaptureHook:
         if not self._hooks:
             raise RuntimeError(
                 "No attention layers found. Supported architectures: "
-                "Mistral, Llama, Qwen2, Yi"
+                "Mistral, Llama, Qwen2, Yi, Gemma4"
             )
         print(f"  Registered {len(self._hooks)} attention hooks")
 
@@ -219,13 +223,21 @@ def main():
 
     # Load model
     print("\nLoading model...")
+    auto_config = AutoConfig.from_pretrained(args.model)
+    is_multimodal = hasattr(auto_config, "text_config")
+
     tokenizer = AutoTokenizer.from_pretrained(args.model)
-    model = AutoModelForCausalLM.from_pretrained(
-        args.model,
-        torch_dtype=torch.float16,
+    model_kwargs = dict(
+        dtype=torch.float16,
         device_map=args.device,
         attn_implementation="sdpa",
     )
+    if is_multimodal:
+        from transformers import AutoModelForImageTextToText
+        model = AutoModelForImageTextToText.from_pretrained(args.model, **model_kwargs)
+        print(f"  Multimodal model ({auto_config.model_type}) — loaded via AutoModelForImageTextToText")
+    else:
+        model = AutoModelForCausalLM.from_pretrained(args.model, **model_kwargs)
     model.eval()
     print(f"  Loaded: {args.model} ({sum(p.numel() for p in model.parameters()) / 1e9:.2f}B params)")
 

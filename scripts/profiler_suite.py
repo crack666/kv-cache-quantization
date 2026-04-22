@@ -134,7 +134,7 @@ def run_single_combination(
     vram_total_mb = 0.0
     if args.device == "cuda":
         profiler = VRAMProfiler()
-        vram_total_mb = torch.cuda.get_device_properties(0).total_mem / (1024 * 1024)
+        vram_total_mb = torch.cuda.get_device_properties(0).total_memory / (1024 * 1024)
 
     # Load model
     model, tokenizer, info = load_model(
@@ -177,7 +177,7 @@ def run_single_combination(
             from transformers import QuantizedCache
             cache = QuantizedCache(
                 backend=kv_cfg["backend"],
-                config=model.config,
+                config=info["text_config"],
                 nbits=kv_cfg["nbits"],
                 axis_key=0 if kv_cfg["backend"] == "quanto" else 1,
                 axis_value=0 if kv_cfg["backend"] == "quanto" else 1,
@@ -210,12 +210,12 @@ def run_single_combination(
         last_token = input_ids[:, -1:]
 
         # Build a prefill_fn for caches that can't be deepcopied (e.g. quanto)
-        def _re_prefill(_ids=input_ids, _kv_cfg=kv_cfg, _model=model, _mcfg=model.config):
+        def _re_prefill(_ids=input_ids, _kv_cfg=kv_cfg, _model=model, _tcfg=info["text_config"]):
             if _kv_cfg["enabled"]:
                 from transformers import QuantizedCache
                 c = QuantizedCache(
                     backend=_kv_cfg["backend"],
-                    config=_mcfg,
+                    config=_tcfg,
                     nbits=_kv_cfg["nbits"],
                     axis_key=0 if _kv_cfg["backend"] == "quanto" else 1,
                     axis_value=0 if _kv_cfg["backend"] == "quanto" else 1,
@@ -321,11 +321,11 @@ def run_single_combination(
 
         # Quantized PPL (through the cache — measures quant quality loss)
         if kv_cfg["enabled"]:
-            def _make_cache():
+            def _make_cache(_tcfg=info["text_config"]):
                 from transformers import QuantizedCache
                 return QuantizedCache(
                     backend=kv_cfg["backend"],
-                    config=model.config,
+                    config=_tcfg,
                     nbits=kv_cfg["nbits"],
                     axis_key=0 if kv_cfg["backend"] == "quanto" else 1,
                     axis_value=0 if kv_cfg["backend"] == "quanto" else 1,
