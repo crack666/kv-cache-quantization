@@ -91,11 +91,15 @@ def build_parser() -> argparse.ArgumentParser:
         "--benchmarks",
         nargs="+",
         default=[],
-        choices=["ppl", "mmlu", "hellaswag"],
+        choices=["ppl", "needle", "mmlu", "hellaswag"],
         help="Benchmarks to run after profiling (default: none)",
     )
     p.add_argument("--ppl-dataset", default="wikitext2", choices=["wikitext2", "pg19"])
     p.add_argument("--ppl-tokens", type=int, default=4096, help="Sliding-window size for PPL")
+    p.add_argument("--needle-depths", type=float, nargs="+", default=[0.1, 0.25, 0.5, 0.75, 0.9],
+                   help="Depth positions for Needle-in-a-Haystack (default: 0.1 0.25 0.5 0.75 0.9)")
+    p.add_argument("--residual-length", type=int, default=128,
+                   help="Number of recent KV tokens kept in FP16 (KIVI residual buffer, default: 128)")
 
     # Measurement
     p.add_argument("--warmup-runs", type=int, default=2)
@@ -150,8 +154,9 @@ def run_single_combination(
     kv_cfg = info["kv_quant"]
     if kv_cfg["enabled"]:
         patch_quantized_cache()
+        kv_cfg["residual_length"] = args.residual_length
         mode = "KIVI asymmetric" if kv_cfg["asymmetric"] else "symmetric"
-        print(f"  KV-Quant: int{kv_cfg['nbits']}-{kv_cfg['backend']} ({mode}, axis_key={kv_cfg['axis_key']}, axis_value={kv_cfg['axis_value']})")
+        print(f"  KV-Quant: int{kv_cfg['nbits']}-{kv_cfg['backend']} ({mode}, axis_key={kv_cfg['axis_key']}, axis_value={kv_cfg['axis_value']}, residual={kv_cfg['residual_length']})")
 
     if profiler:
         profiler.log_vram("model_loaded")
@@ -185,6 +190,7 @@ def run_single_combination(
                 nbits=kv_cfg["nbits"],
                 axis_key=kv_cfg["axis_key"],
                 axis_value=kv_cfg["axis_value"],
+                residual_length=kv_cfg["residual_length"],
             )
         else:
             from transformers import DynamicCache
@@ -223,6 +229,7 @@ def run_single_combination(
                     nbits=_kv_cfg["nbits"],
                     axis_key=_kv_cfg["axis_key"],
                     axis_value=_kv_cfg["axis_value"],
+                    residual_length=_kv_cfg["residual_length"],
                 )
             else:
                 from transformers import DynamicCache
@@ -333,6 +340,7 @@ def run_single_combination(
                     nbits=kv_cfg["nbits"],
                     axis_key=kv_cfg["axis_key"],
                     axis_value=kv_cfg["axis_value"],
+                    residual_length=kv_cfg["residual_length"],
                 )
 
             print("  Running perplexity benchmark (quantized cache)...")
@@ -365,6 +373,19 @@ def run_single_combination(
         for task_name, scores in eval_results.items():
             benchmarks[task_name] = scores
             print(f"  {task_name}: acc={scores['accuracy']:.4f} ± {scores['stderr']:.4f}")
+
+    if "needle" in args.benchmarks:
+        from benchmarks.needle_haystack import run_needle_test
+        print(f"\nRunning Needle-in-a-Haystack (depths={args.needle_depths}, ctx={context_lengths})...")
+        needle_results = run_needle_test(
+            model, tokenizer,
+            context_lengths=context_lengths,
+            depths=args.needle_depths,
+            kv_quant_cfg=kv_cfg if kv_cfg["enabled"] else None,
+            text_config=info["text_config"],
+            device=args.device,
+        )
+        benchmarks["needle_in_haystack"] = needle_results["summary"]
 
     # ── Assemble JSON v2 ─────────────────────────────────────────────────
     timestamp = datetime.now()
