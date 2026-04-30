@@ -56,14 +56,35 @@ def _resolve_sage():
 
 
 def _parse_kv_quant(kv_quant: str) -> Dict:
-    """Parse a kv-quant spec string like 'int8-hqq' into a config dict."""
+    """Parse a kv-quant spec string like 'int8-hqq' or 'int2-hqq-kivi' into a config dict.
+
+    Supported formats:
+        - 'none'           → no quantization
+        - 'int8-hqq'       → symmetric quant (both axes same: hqq=1, quanto=0)
+        - 'int4-quanto'    → symmetric quant
+        - 'int2-hqq-kivi'  → KIVI-style asymmetric (keys per-channel, values per-token)
+
+    The 'kivi' suffix switches to asymmetric axes:
+        - axis_key=0 (per-channel: each channel gets its own scale)
+        - axis_value=1 (per-token: each token position gets its own scale)
+    This matches KIVI (Liu et al., ICML 2024) which found that key caches have
+    per-channel outliers while value caches have per-token outliers.
+    """
     if kv_quant is None or kv_quant == "none":
-        return {"enabled": False, "nbits": None, "backend": None}
+        return {"enabled": False, "nbits": None, "backend": None, "axis_key": None, "axis_value": None, "asymmetric": False}
 
     parts = kv_quant.lower().split("-")
+
+    # Check for KIVI suffix: e.g. 'int2-hqq-kivi'
+    asymmetric = False
+    if len(parts) == 3 and parts[2] == "kivi":
+        asymmetric = True
+        parts = parts[:2]
+
     if len(parts) != 2 or not parts[0].startswith("int"):
         raise ValueError(
-            f"Invalid kv_quant spec '{kv_quant}'. Expected format: 'int8-hqq', 'int4-quanto', etc."
+            f"Invalid kv_quant spec '{kv_quant}'. "
+            "Expected format: 'int8-hqq', 'int4-quanto', 'int2-hqq-kivi', etc."
         )
     nbits = int(parts[0].replace("int", ""))
     backend = parts[1]
@@ -71,7 +92,25 @@ def _parse_kv_quant(kv_quant: str) -> Dict:
         raise ValueError(f"Unknown quantization backend '{backend}'. Supported: hqq, quanto")
     if nbits not in (2, 4, 8):
         raise ValueError(f"Unsupported bit-width {nbits}. Supported: 2, 4, 8")
-    return {"enabled": True, "nbits": nbits, "backend": backend}
+
+    # Axis selection: symmetric (default) vs asymmetric (KIVI)
+    if asymmetric:
+        # KIVI: keys per-channel (axis=0), values per-token (axis=1)
+        axis_key = 0
+        axis_value = 1
+    else:
+        # Symmetric default: hqq→1, quanto→0 (per HF recommendations)
+        axis_key = 0 if backend == "quanto" else 1
+        axis_value = 0 if backend == "quanto" else 1
+
+    return {
+        "enabled": True,
+        "nbits": nbits,
+        "backend": backend,
+        "axis_key": axis_key,
+        "axis_value": axis_value,
+        "asymmetric": asymmetric,
+    }
 
 
 def _get_text_config(model_config):

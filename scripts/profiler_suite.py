@@ -74,7 +74,9 @@ def build_parser() -> argparse.ArgumentParser:
         "--kv-quant",
         nargs="+",
         default=["none"],
-        help="KV-cache quantization spec(s): none, int8-hqq, int4-hqq, int4-quanto, int2-hqq (default: none)",
+        help="KV-cache quantization spec(s). Format: int{2,4,8}-{hqq,quanto}[-kivi]. "
+             "The '-kivi' suffix enables asymmetric axes (keys per-channel, values per-token). "
+             "Examples: none, int8-hqq, int4-hqq, int4-hqq-kivi, int2-hqq-kivi (default: none)",
     )
     p.add_argument(
         "--context-lengths",
@@ -148,6 +150,8 @@ def run_single_combination(
     kv_cfg = info["kv_quant"]
     if kv_cfg["enabled"]:
         patch_quantized_cache()
+        mode = "KIVI asymmetric" if kv_cfg["asymmetric"] else "symmetric"
+        print(f"  KV-Quant: int{kv_cfg['nbits']}-{kv_cfg['backend']} ({mode}, axis_key={kv_cfg['axis_key']}, axis_value={kv_cfg['axis_value']})")
 
     if profiler:
         profiler.log_vram("model_loaded")
@@ -179,8 +183,8 @@ def run_single_combination(
                 backend=kv_cfg["backend"],
                 config=info["text_config"],
                 nbits=kv_cfg["nbits"],
-                axis_key=0 if kv_cfg["backend"] == "quanto" else 1,
-                axis_value=0 if kv_cfg["backend"] == "quanto" else 1,
+                axis_key=kv_cfg["axis_key"],
+                axis_value=kv_cfg["axis_value"],
             )
         else:
             from transformers import DynamicCache
@@ -217,8 +221,8 @@ def run_single_combination(
                     backend=_kv_cfg["backend"],
                     config=_tcfg,
                     nbits=_kv_cfg["nbits"],
-                    axis_key=0 if _kv_cfg["backend"] == "quanto" else 1,
-                    axis_value=0 if _kv_cfg["backend"] == "quanto" else 1,
+                    axis_key=_kv_cfg["axis_key"],
+                    axis_value=_kv_cfg["axis_value"],
                 )
             else:
                 from transformers import DynamicCache
@@ -327,8 +331,8 @@ def run_single_combination(
                     backend=kv_cfg["backend"],
                     config=_tcfg,
                     nbits=kv_cfg["nbits"],
-                    axis_key=0 if kv_cfg["backend"] == "quanto" else 1,
-                    axis_value=0 if kv_cfg["backend"] == "quanto" else 1,
+                    axis_key=kv_cfg["axis_key"],
+                    axis_value=kv_cfg["axis_value"],
                 )
 
             print("  Running perplexity benchmark (quantized cache)...")
@@ -479,7 +483,10 @@ def main():
 
         row = {
             "backend": r["attn_backend"],
-            "kv_quant": "fp16" if not r["kv_quant"]["enabled"] else f"int{r['kv_quant']['nbits']}-{r['kv_quant']['backend']}",
+            "kv_quant": "fp16" if not r["kv_quant"]["enabled"] else f"int{r['kv_quant']['nbits']}-{r['kv_quant']['backend']}{'(kivi)' if r['kv_quant'].get('asymmetric') else ''}",
+            "axis_key": r["kv_quant"].get("axis_key"),
+            "axis_value": r["kv_quant"].get("axis_value"),
+            "asymmetric": r["kv_quant"].get("asymmetric", False),
             "ctx": last_m.get("context_len", "?"),
             "prefill_ms": last_m.get("prefill_ms"),
             "decode_tok_s": last_m.get("decode_tokens_per_sec"),
