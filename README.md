@@ -9,9 +9,9 @@
 
 ## Overview
 
-This repository contains the **profiling code and measurement data** for the master thesis on KV-Cache quantization. We systematically evaluate INT8, INT4, and INT2 quantization of the Key-Value Cache across four LLMs with different Grouped Query Attention (GQA) architectures.
+Profiling code and measurement data for the master thesis on KV-Cache quantization. We systematically evaluate INT8, INT4, and INT2 quantization of the Key-Value Cache across four LLMs with different Grouped Query Attention (GQA) architectures — measuring memory, latency, perplexity, and long-context retrieval (Needle-in-a-Haystack).
 
-### Key Finding
+### Key Findings (WisPro Phase)
 
 > The GQA ratio is **not** a reliable predictor of quantization tolerance. Yi-1.5-9B (8:1) tolerates INT2 with only +15% PPL degradation, while Qwen2-7B (7:1) fails catastrophically at INT4.
 
@@ -32,17 +32,26 @@ This repository contains the **profiling code and measurement data** for the mas
 
 ```
 .
-├── scripts/                    # Profiling and analysis scripts
-│   ├── profile_quant_overhead.py   # Main profiler (KV-cache, PPL, throughput)
+├── scripts/
+│   ├── profiler_suite.py           # Main CLI: profiling + benchmarks (PPL, Needle)
+│   ├── benchmarks/
+│   │   ├── needle_haystack.py      # Needle-in-a-Haystack (RULER-style echo-prompt)
+│   │   └── perplexity.py           # WikiText-2 / PG-19 sliding-window PPL
+│   ├── core/
+│   │   ├── model_loader.py         # HF model loading with KV-quant config
+│   │   ├── kv_cache.py             # Cache patching, size measurement, timings
+│   │   ├── vram_profiler.py        # CUDA peak memory tracking
+│   │   └── metrics.py              # Prefill latency, decode throughput
 │   ├── aggregate_results.py        # Combine JSON results
 │   ├── analyze_delta_ppl.py        # PPL degradation analysis
 │   └── generate_*.py               # Table/figure generation
 ├── results/
-│   ├── raw/                    # JSON measurement files (per model)
-│   ├── figures/                # Generated plots (PDF)
-│   └── tables/                 # LaTeX tables
-├── requirements.txt            # Python dependencies
-├── environment.yml             # Conda environment
+│   ├── raw/                        # JSON measurement files
+│   │   └── long_context/           # MA phase: 4k–32k context runs
+│   ├── figures/                    # Generated plots (PDF)
+│   └── tables/                     # LaTeX tables
+├── requirements.txt
+├── environment.yml
 └── README.md
 ```
 
@@ -62,25 +71,47 @@ pip install -r requirements.txt
 ### 2. Run Profiling
 
 ```bash
-# Profile a model across context lengths 128-4096
-python scripts/profile_quant_overhead.py --model mistralai/Mistral-7B-v0.1
+# Full profiling + benchmarks for one model
+python scripts/profiler_suite.py \
+  --model mistralai/Mistral-7B-v0.1 \
+  --attn-backend sdpa \
+  --kv-quant none int8-hqq int4-hqq int2-hqq int2-hqq-kivi \
+  --context-lengths 4096 8192 16384 32768 \
+  --benchmarks ppl needle \
+  --output-dir results/raw/long_context/ \
+  --seed 42
 
-# Profile specific context lengths
-python scripts/profile_quant_overhead.py --model Qwen/Qwen2-7B --context 512 1024 2048
+# Minimal: profile one model, FP16 only
+python scripts/profiler_suite.py --model gpt2 --context-lengths 128 256
 ```
 
-**Output:** JSON file in `results/raw/profile_<model>_<timestamp>.json` containing:
-- KV-cache sizes (MB) for FP16/INT8/INT4/INT2
-- Perplexity for quality assessment
-- Throughput (tokens/s) and quantization overhead (%)
+**Output:** One JSON per (backend × kv-quant) combination containing:
+- Measurements per context length (prefill, decode, VRAM, KV size)
+- Perplexity (reference + quantized + delta)
+- Needle-in-a-Haystack trials (per depth × context length)
 
-### 3. Analyze Results
+### 3. Patch Benchmarks (re-run without re-profiling)
+
+If a benchmark needs to be re-run (e.g. after fixing the needle prompt), patch existing result files without repeating expensive profiling:
 
 ```bash
-# Aggregate all JSON files into summary
-python scripts/aggregate_results.py
+# Re-run needle on all Mistral results
+python scripts/profiler_suite.py \
+  --model mistralai/Mistral-7B-v0.1 \
+  --patch results/raw/long_context/mistral_7b_*.json \
+  --benchmarks needle
 
-# Generate PPL degradation analysis
+# Re-run PPL on a specific file, no backup
+python scripts/profiler_suite.py \
+  --model mistralai/Mistral-7B-v0.1 \
+  --patch results/raw/long_context/mistral_7b_v0.1_sdpa_fp16_20260502_152932.json \
+  --benchmarks ppl --no-backup
+```
+
+### 4. Analyze Results
+
+```bash
+python scripts/aggregate_results.py
 python scripts/analyze_delta_ppl.py
 ```
 
@@ -88,37 +119,40 @@ python scripts/analyze_delta_ppl.py
 
 ## Quantization Backend
 
-We use **HQQ (Half-Quadratic Quantization)** via HuggingFace Transformers with:
+We use **HQQ (Half-Quadratic Quantization)** via HuggingFace Transformers:
 
-- **INT8**: Group Size 64, Axis 0
-- **INT4**: Group Size 64, Axis 0  
-- **INT2**: Group Size 16, Axis 0
-- **Residual Length**: 128 tokens (last 128 tokens remain in FP16)
+| Config | Bits | Group Size | Axis | Mode |
+|--------|------|-----------|------|------|
+| `int8-hqq` | 8 | 64 | 0 | Symmetric |
+| `int4-hqq` | 4 | 64 | 0 | Symmetric |
+| `int2-hqq` | 2 | 16 | 0 | Symmetric |
+| `int2-hqq-kivi` | 2 | 16 | Keys: 0, Values: 1 | Asymmetric (KIVI) |
+
+**Residual Length**: 128 tokens (last 128 KV entries remain in FP16).
 
 ---
 
-## Results Summary
+## Needle-in-a-Haystack Benchmark
 
-### Memory Reduction
+Tests whether KV-cache quantization destroys long-range retrieval ability.
 
-| Bitwidth | KV-Cache Size | Reduction |
-|----------|---------------|-----------|
-| FP16 | 100% (baseline) | — |
-| INT8 | 50% | 2× compression |
-| INT4 | 25% | 4× compression |
-| INT2 | 12.5% | 8× compression |
+- **Format**: Completion/echo-prompt (RULER-style, base-model friendly)
+- **Needle**: `"The special magic number for this experiment is 7492."`
+- **Prompt**: `"The special magic number for this experiment is"` (model completes)
+- **Scoring**: Case-insensitive string match (`"7492" in output`)
+- **Reference**: Hsieh et al. (2024), "RULER", COLM 2024
 
-### Practical Recommendations
+---
 
-- **INT8**: Universally safe (<1% PPL degradation)
+## Practical Recommendations
+
+- **INT8**: Universally safe (<1% PPL degradation, no retrieval loss)
 - **INT4**: Requires model-specific validation
 - **INT2**: Only for robust models (Mistral-7B, Yi-1.5-9B)
 
 ---
 
 ## Citation
-
-If you use this code or data, please cite the thesis:
 
 ```bibtex
 @mastersthesis{behr2026kvcache,

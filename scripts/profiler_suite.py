@@ -114,6 +114,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--device", default="cuda", choices=["cuda", "cpu"])
 
+    # Patch mode
+    p.add_argument("--patch", nargs="+", default=None, metavar="JSON_FILE",
+                   help="Re-run specified --benchmarks on existing result JSON(s) and overwrite "
+                        "the benchmark section in-place. Creates .bak backup before overwriting.")
+    p.add_argument("--no-backup", action="store_true",
+                   help="Skip .bak creation when using --patch")
+
     return p
 
 
@@ -443,12 +450,173 @@ def run_single_combination(
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+# Patch mode — re-run benchmarks on existing result files
+# ═══════════════════════════════════════════════════════════════════════════
+
+def run_patch_mode(args):
+    """Re-run specified benchmarks on existing JSON result files.
+
+    Loads each JSON, reconstructs the model + kv_quant config, runs only the
+    requested benchmarks, and overwrites the benchmark section in-place.
+    """
+    import shutil
+
+    if not args.benchmarks:
+        print("ERROR: --patch requires --benchmarks to specify which benchmarks to re-run.")
+        sys.exit(1)
+
+    files = [Path(f) for f in args.patch]
+    missing = [f for f in files if not f.exists()]
+    if missing:
+        print(f"ERROR: Files not found: {missing}")
+        sys.exit(1)
+
+    print("=" * 80)
+    print(f"PATCH MODE — {len(files)} file(s), re-running: {args.benchmarks}")
+    print("=" * 80)
+
+    # Group files by model to avoid reloading the same model repeatedly
+    from collections import defaultdict
+    by_model = defaultdict(list)
+    for f in files:
+        with open(f) as fp:
+            data = json.load(fp)
+        by_model[data["model"]].append((f, data))
+
+    for model_id, file_data_pairs in by_model.items():
+        print(f"\n{'─'*60}")
+        print(f"Model: {model_id} ({len(file_data_pairs)} file(s))")
+        print(f"{'─'*60}")
+
+        # We need to load the model once per unique (model, attn_backend) pair
+        # Group by attn_backend within each model
+        by_backend = defaultdict(list)
+        for f, data in file_data_pairs:
+            by_backend[data.get("attn_backend", "sdpa")].append((f, data))
+
+        for attn_backend, backend_pairs in by_backend.items():
+            # Determine kv_quant for model loading — use the first file's config
+            # (we'll re-patch the cache per file anyway)
+            first_data = backend_pairs[0][1]
+            first_kv = first_data["kv_quant"]
+            kv_quant_str = None
+            if first_kv.get("enabled"):
+                kv_quant_str = f"int{first_kv['nbits']}-{first_kv['backend']}"
+                if first_kv.get("asymmetric"):
+                    kv_quant_str += "-kivi"
+
+            # Load model once
+            print(f"\n  Loading model (attn={attn_backend})...")
+            model, tokenizer, info = load_model(
+                model_id,
+                attn_backend=attn_backend,
+                kv_quant=kv_quant_str,
+                device=args.device,
+                dtype=torch.float16,
+            )
+            if first_kv.get("enabled"):
+                patch_quantized_cache()
+
+            for filepath, data in backend_pairs:
+                print(f"\n  Patching: {filepath.name}")
+
+                # Reconstruct kv_quant_cfg for this specific file
+                kv_cfg = data["kv_quant"]
+                context_lengths = [m["context_len"] for m in data["measurements"]]
+
+                # Backup
+                if not args.no_backup:
+                    bak_path = filepath.with_suffix(".json.bak")
+                    shutil.copy2(filepath, bak_path)
+                    print(f"    Backup: {bak_path.name}")
+
+                # Re-run requested benchmarks
+                benchmarks = data.get("benchmarks", {})
+
+                if "ppl" in args.benchmarks:
+                    from benchmarks.perplexity import compute_perplexity
+                    print("    Re-running perplexity...")
+                    ppl_ref = compute_perplexity(
+                        model, tokenizer,
+                        dataset=args.ppl_dataset,
+                        max_tokens=args.ppl_tokens,
+                        device=args.device,
+                    )
+                    benchmarks["perplexity"] = {
+                        "dataset": args.ppl_dataset,
+                        "tokens": args.ppl_tokens,
+                        "value": ppl_ref,
+                    }
+                    if kv_cfg.get("enabled"):
+                        def _make_cache(_tcfg=info["text_config"], _kv=kv_cfg):
+                            from transformers import QuantizedCache
+                            return QuantizedCache(
+                                backend=_kv["backend"],
+                                config=_tcfg,
+                                nbits=_kv["nbits"],
+                                axis_key=_kv["axis_key"],
+                                axis_value=_kv["axis_value"],
+                                residual_length=_kv.get("residual_length", 128),
+                            )
+                        ppl_quant = compute_perplexity(
+                            model, tokenizer,
+                            dataset=args.ppl_dataset,
+                            max_tokens=args.ppl_tokens,
+                            device=args.device,
+                            cache_factory=_make_cache,
+                        )
+                        benchmarks["perplexity_quantized"] = {
+                            "dataset": args.ppl_dataset,
+                            "tokens": args.ppl_tokens,
+                            "value": ppl_quant,
+                        }
+                        print(f"    PPL ref={ppl_ref:.4f}, quant={ppl_quant:.4f}, Δ={ppl_quant-ppl_ref:+.4f}")
+                    else:
+                        print(f"    PPL ref={ppl_ref:.4f}")
+
+                if "needle" in args.benchmarks:
+                    from benchmarks.needle_haystack import run_needle_test
+                    print(f"    Re-running Needle (ctx={context_lengths}, depths={args.needle_depths})...")
+                    needle_results = run_needle_test(
+                        model, tokenizer,
+                        context_lengths=context_lengths,
+                        depths=args.needle_depths,
+                        kv_quant_cfg=kv_cfg if kv_cfg.get("enabled") else None,
+                        text_config=info["text_config"],
+                        device=args.device,
+                    )
+                    benchmarks["needle_in_haystack"] = needle_results["summary"]
+                    benchmarks["needle_in_haystack_trials"] = needle_results["trials"]
+
+                # Write back
+                data["benchmarks"] = benchmarks
+                with open(filepath, "w") as fp:
+                    json.dump(data, fp, indent=2)
+                print(f"    ✓ Saved: {filepath.name}")
+
+            # Cleanup model
+            del model, tokenizer
+            gc.collect()
+            if args.device == "cuda":
+                torch.cuda.empty_cache()
+
+    print(f"\n{'='*80}")
+    print(f"PATCH complete — {len(files)} file(s) updated.")
+    print(f"{'='*80}")
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 # Orchestrator
 # ═══════════════════════════════════════════════════════════════════════════
 
 def main():
     parser = build_parser()
     args = parser.parse_args()
+
+    # Patch mode: re-run benchmarks on existing JSONs
+    if args.patch:
+        run_patch_mode(args)
+        return
 
     combos = list(product(args.attn_backend, args.kv_quant))
     total = len(combos)
