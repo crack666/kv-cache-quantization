@@ -158,8 +158,12 @@ def run_needle_test(
             trial_idx += 1
             print(f"  [{trial_idx}/{total_trials}] ctx={ctx_len}, depth={depth:.0%}", end=" ")
 
+            # Reserve space for the retrieval prompt + separator so it never gets truncated
+            prompt_tokens = len(tokenizer.encode(f"\n\n{retrieval_prompt}", add_special_tokens=False))
+            haystack_budget = ctx_len - prompt_tokens - 10  # 10 token safety margin
+
             # Build prompt: haystack + completion prompt
-            haystack = _build_haystack(tokenizer, ctx_len, needle, depth)
+            haystack = _build_haystack(tokenizer, haystack_budget, needle, depth)
             prompt = f"{haystack}\n\n{retrieval_prompt}"
 
             # Tokenize (truncate to ctx_len to stay within budget)
