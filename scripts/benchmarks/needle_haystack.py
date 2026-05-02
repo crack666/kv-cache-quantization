@@ -41,24 +41,15 @@ RETRIEVAL_PROMPT = (
 )
 EXPECTED_ANSWER = "7492"
 
-# Filler text — repetitive but varied enough to not get compressed by tokenizer
+# Filler text — RULER noise sentences (Hsieh et al., 2024)
+# Deliberately number-free to avoid distractor confusion with the numeric needle.
+# Reference: NVIDIA/RULER, type_haystack='noise'
 _FILLER_SENTENCES = [
-    "The history of natural language processing generally started in the 1950s.",
-    "Machine translation was one of the first computer-based translation approaches.",
-    "In recent years, deep learning has transformed the field of artificial intelligence.",
-    "Neural networks can learn complex patterns from large amounts of training data.",
-    "Transformer architectures have become the foundation of modern language models.",
-    "Attention mechanisms allow models to focus on relevant parts of the input.",
-    "Pre-training on large corpora enables transfer learning for downstream tasks.",
-    "The development of GPUs has accelerated the training of large neural networks.",
-    "Tokenization is a fundamental step in processing natural language text.",
-    "Evaluation metrics help researchers measure model performance objectively.",
-    "Beam search and sampling are common strategies for text generation.",
-    "Context windows determine how much text a model can process at once.",
-    "Memory efficiency is crucial for deploying large models on limited hardware.",
-    "Quantization reduces the precision of numerical representations to save memory.",
-    "The trade-off between model size and performance is an active research area.",
-    "Distributed computing allows training models that exceed single-GPU memory.",
+    "The grass is green.",
+    "The sky is blue.",
+    "The sun is yellow.",
+    "Here we go.",
+    "There and back again.",
 ]
 
 
