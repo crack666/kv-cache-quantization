@@ -2,8 +2,13 @@
 
 Tests whether quantization destroys the model's ability to retrieve specific
 information from long contexts. A known "needle" (fact) is inserted at various
-depth positions within a long "haystack" (filler text), and the model is asked
-to retrieve it.
+depth positions within a long "haystack" (filler text), and the model is
+prompted to complete a sentence that requires recalling the needle.
+
+Design: Uses completion-style prompting ("The special magic number mentioned
+in the text is:") rather than Q&A format. This is methodologically appropriate
+for base (non-instruction-tuned) models which are trained to continue text,
+not answer questions. Reference: Kamradt (2023), RULER (Hsieh et al., 2024).
 
 Usage (standalone):
     python -m benchmarks.needle_haystack \
@@ -23,14 +28,16 @@ import torch
 from typing import Callable, Dict, List, Optional
 
 
-# ── Default needle and retrieval question ────────────────────────────────
+# ── Default needle and retrieval prompt ───────────────────────────────────
 NEEDLE = (
     "The special magic number for this experiment is 7492. "
     "Remember this number: 7492."
 )
-RETRIEVAL_QUESTION = (
-    "What is the special magic number mentioned in the text? "
-    "Answer with just the number."
+# Answer-prefix prompt (RULER-style, base-model friendly)
+# Echoes the needle's sentence start so the model only needs to complete the value.
+# Reference: Hsieh et al. (2024), "RULER", COLM 2024 (arXiv:2404.06654)
+RETRIEVAL_PROMPT = (
+    "The special magic number for this experiment is"
 )
 EXPECTED_ANSWER = "7492"
 
@@ -90,8 +97,11 @@ def _build_haystack(tokenizer, target_tokens: int, needle: str, depth_percent: f
 
 
 def _check_answer(generated_text: str, expected: str = EXPECTED_ANSWER) -> bool:
-    """Check if the generated text contains the expected answer."""
-    return expected in generated_text
+    """Check if the generated text contains the expected answer (case-insensitive).
+
+    Follows RULER (Hsieh et al., 2024) string_match_all metric.
+    """
+    return expected.lower() in generated_text.lower()
 
 
 def run_needle_test(
@@ -102,7 +112,7 @@ def run_needle_test(
     kv_quant_cfg: Optional[Dict] = None,
     text_config=None,
     needle: str = NEEDLE,
-    question: str = RETRIEVAL_QUESTION,
+    retrieval_prompt: str = RETRIEVAL_PROMPT,
     expected: str = EXPECTED_ANSWER,
     max_new_tokens: int = 32,
     device: str = "cuda",
@@ -117,7 +127,7 @@ def run_needle_test(
         kv_quant_cfg: KV-quant config dict from _parse_kv_quant (or None for FP16).
         text_config: Model text config (needed for QuantizedCache).
         needle: The fact to hide.
-        question: The retrieval question.
+        retrieval_prompt: Completion prompt appended after the haystack.
         expected: Expected answer string.
         max_new_tokens: Max tokens to generate for the answer.
         device: Torch device.
@@ -132,8 +142,9 @@ def run_needle_test(
 
     results = {
         "needle": needle,
-        "question": question,
+        "retrieval_prompt": retrieval_prompt,
         "expected": expected,
+        "format": "completion",
         "trials": [],
         "summary": {},
     }
@@ -147,9 +158,9 @@ def run_needle_test(
             trial_idx += 1
             print(f"  [{trial_idx}/{total_trials}] ctx={ctx_len}, depth={depth:.0%}", end=" ")
 
-            # Build prompt: haystack + question
+            # Build prompt: haystack + completion prompt
             haystack = _build_haystack(tokenizer, ctx_len, needle, depth)
-            prompt = f"{haystack}\n\nQuestion: {question}\nAnswer:"
+            prompt = f"{haystack}\n\n{retrieval_prompt}"
 
             # Tokenize (truncate to ctx_len to stay within budget)
             inputs = tokenizer(

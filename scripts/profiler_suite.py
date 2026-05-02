@@ -386,6 +386,7 @@ def run_single_combination(
             device=args.device,
         )
         benchmarks["needle_in_haystack"] = needle_results["summary"]
+        benchmarks["needle_in_haystack_trials"] = needle_results["trials"]
 
     # ── Assemble JSON v2 ─────────────────────────────────────────────────
     timestamp = datetime.now()
