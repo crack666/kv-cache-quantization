@@ -121,12 +121,69 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--no-backup", action="store_true",
                    help="Skip .bak creation when using --patch")
 
+    # Diagnostics
+    p.add_argument("--vram-diag", action="store_true",
+                   help="Enable VRAM leak diagnostics: log all surviving CUDA tensors >1MB at cleanup points")
+
     return p
 
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Single-combination runner
 # ═══════════════════════════════════════════════════════════════════════════
+
+# VRAM leak diagnostics (enabled via --vram-diag)
+_VRAM_DIAG = False
+
+
+def _diagnose_leaked_tensors(label: str = ""):
+    """Find all CUDA tensors still alive on GPU and print what holds them.
+
+    Only active when --vram-diag is set. Iterates gc objects to find leaked
+    tensors >1 MB and shows their referrer types.
+    """
+    if not _VRAM_DIAG:
+        return
+    gc.collect()
+    leaked = []
+    for obj in gc.get_objects():
+        if torch.is_tensor(obj) and obj.is_cuda:
+            size_mb = obj.nelement() * obj.element_size() / 1e6
+            if size_mb > 1.0:
+                try:
+                    referrers = [type(r).__name__ for r in gc.get_referrers(obj)[:5]]
+                except Exception:
+                    referrers = ["<error>"]
+                leaked.append((size_mb, tuple(obj.shape), str(obj.dtype), referrers))
+
+    leaked.sort(reverse=True)
+    total = sum(s for s, *_ in leaked)
+    print(f"\n  [LEAK-DIAG {label}] {len(leaked)} CUDA tensors >1MB still alive ({total:.0f}MB total):")
+    for size, shape, dtype, refs in leaked[:15]:
+        print(f"    {size:8.1f}MB | {str(shape):30s} | {dtype} | held by: {refs}")
+    if len(leaked) > 15:
+        print(f"    ... and {len(leaked) - 15} more")
+
+
+def _force_cuda_cleanup():
+    """Aggressively release CUDA memory between combinations.
+
+    PyTorch's caching allocator and CUDA context can retain memory even after
+    empty_cache(). This forces release of IPC pages and gives CUDA time to
+    reclaim pages before we measure a new baseline.
+    """
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        torch.cuda.ipc_collect()
+        torch.cuda.synchronize()
+        # Small delay to let the CUDA driver reclaim pages
+        time.sleep(1.0)
+        # Second pass — sometimes needed for full release
+        gc.collect()
+        torch.cuda.empty_cache()
+    _diagnose_leaked_tensors("after_force_cleanup")
+
 
 def run_single_combination(
     model_id: str,
@@ -146,6 +203,7 @@ def run_single_combination(
     profiler = None
     vram_total_mb = 0.0
     if args.device == "cuda":
+        _force_cuda_cleanup()  # Ensure clean state before baseline measurement
         profiler = VRAMProfiler()
         vram_total_mb = torch.cuda.get_device_properties(0).total_memory / (1024 * 1024)
 
@@ -256,9 +314,11 @@ def run_single_combination(
 
         # VRAM peak + overflow detection
         vram_peak_mb = 0.0
+        vram_reserved_mb = 0.0
         vram_overflow = False
         if args.device == "cuda":
             vram_peak_mb = torch.cuda.max_memory_allocated() / (1024 * 1024)
+            vram_reserved_mb = torch.cuda.max_memory_reserved() / (1024 * 1024)
             if vram_total_mb > 0 and vram_peak_mb > vram_total_mb:
                 vram_overflow = True
                 overflow_mb = vram_peak_mb - vram_total_mb
@@ -293,6 +353,7 @@ def run_single_combination(
             "decode_tokens": decode["tokens"],
             "decode_tokens_per_sec": decode["tokens_per_sec"],
             "vram_peak_mb": round(vram_peak_mb, 1),
+            "vram_reserved_mb": round(vram_reserved_mb, 1),
             "kv_cache_mb": round(kv_mb, 2),
             "kv_cache_type": kv_type,
             "quant_overhead_ms": timing_summary["quantize_total_ms"],
@@ -310,8 +371,8 @@ def run_single_combination(
               f" | KV: {m['kv_cache_mb']:.1f}MB | VRAM peak: {m['vram_peak_mb']:.0f}MB"
               f" | wall: {ctx_elapsed:.1f}s")
 
-        # Free cache for next iteration
-        del filled_cache, cache
+        # Free cache and intermediate objects for next iteration
+        del filled_cache, cache, prefill, decode, _re_prefill
         gc.collect()
         if args.device == "cuda":
             torch.cuda.empty_cache()
@@ -437,14 +498,21 @@ def run_single_combination(
         json.dump(result, f, indent=2)
     print(f"\nSaved: {out_path}")
 
-    # Cleanup
+    # Cleanup — aggressive release to prevent VRAM leak between combos
+    # CRITICAL: delete closures that capture `model` BEFORE deleting model,
+    # otherwise _re_prefill's default arg `_model=model` keeps it alive.
     cleanup_fn = info.get("_cleanup_fn")
-    del model, tokenizer
-    gc.collect()
-    if args.device == "cuda":
-        torch.cuda.empty_cache()
+    # Break all closure references to model/tensors
+    try:
+        del _re_prefill
+    except UnboundLocalError:
+        pass
+    _diagnose_leaked_tensors("after_del_closures")
+    del model, tokenizer, info
+    _diagnose_leaked_tensors("after_del_model")
     if cleanup_fn:
         cleanup_fn()
+    _force_cuda_cleanup()
 
     return result
 
@@ -610,8 +678,12 @@ def run_patch_mode(args):
 # ═══════════════════════════════════════════════════════════════════════════
 
 def main():
+    global _VRAM_DIAG
     parser = build_parser()
     args = parser.parse_args()
+
+    # Enable VRAM diagnostics if requested
+    _VRAM_DIAG = getattr(args, "vram_diag", False)
 
     # Patch mode: re-run benchmarks on existing JSONs
     if args.patch:
