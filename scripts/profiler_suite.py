@@ -369,7 +369,8 @@ def run_single_combination(
         print(f"  Prefill: {m['prefill_ms']:.1f}ms ({m['prefill_tokens_per_sec']:.0f} tok/s)"
               f" | Decode: {m['decode_ms']:.0f}ms total, {m['decode_tokens_per_sec']:.1f} tok/s ({m['decode_tokens']} new tokens)"
               f" | KV: {m['kv_cache_mb']:.1f}MB | VRAM peak: {m['vram_peak_mb']:.0f}MB"
-              f" | wall: {ctx_elapsed:.1f}s")
+              f" | reserved: {m['vram_reserved_mb']:.0f}MB"
+              f" | time elapsed: {ctx_elapsed:.1f}s")
 
         # Free cache and intermediate objects for next iteration
         del filled_cache, cache, prefill, decode, _re_prefill
