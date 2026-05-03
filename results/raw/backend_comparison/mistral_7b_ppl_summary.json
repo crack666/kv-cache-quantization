@@ -1,0 +1,37 @@
+{
+  "model": "mistralai/Mistral-7B-v0.1",
+  "timestamp": "2026-04-22T15:02:33",
+  "total_runtime_s": 257.9,
+  "combinations": [
+    {
+      "backend": "sdpa",
+      "kv_quant": "fp16",
+      "ctx": 8192,
+      "prefill_ms": 1239.105,
+      "decode_tok_s": 19.84,
+      "kv_mb": 1024.0,
+      "vram_peak_mb": 17888.8,
+      "vram_overflow": false,
+      "ppl": 4.611,
+      "ppl_quant": null,
+      "ppl_delta": null,
+      "combo_elapsed_s": 141.5,
+      "json_file": "mistral_7b_v0.1_sdpa_fp16_20260422_150036.json"
+    },
+    {
+      "backend": "sage",
+      "kv_quant": "fp16",
+      "ctx": 8192,
+      "prefill_ms": 773.192,
+      "decode_tok_s": 24.28,
+      "kv_mb": 1024.0,
+      "vram_peak_mb": 17888.8,
+      "vram_overflow": false,
+      "ppl": 57.8258,
+      "ppl_quant": null,
+      "ppl_delta": null,
+      "combo_elapsed_s": 116.0,
+      "json_file": "mistral_7b_v0.1_sage_fp16_20260422_150233.json"
+    }
+  ]
+}
