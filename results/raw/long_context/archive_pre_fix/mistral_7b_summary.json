@@ -1,7 +1,7 @@
 {
   "model": "mistralai/Mistral-7B-v0.1",
-  "timestamp": "2026-05-03T16:20:13",
-  "total_runtime_s": 12347.5,
+  "timestamp": "2026-05-02T20:49:23",
+  "total_runtime_s": 7658.8,
   "combinations": [
     {
       "backend": "sdpa",
@@ -10,16 +10,16 @@
       "axis_value": null,
       "asymmetric": false,
       "ctx": 32768,
-      "prefill_ms": 9865.478,
-      "decode_tok_s": 0.03,
+      "prefill_ms": 10266.109,
+      "decode_tok_s": 0.05,
       "kv_mb": 4096.0,
       "vram_peak_mb": 30989.1,
       "vram_overflow": false,
       "ppl": 4.611,
       "ppl_quant": null,
       "ppl_delta": null,
-      "combo_elapsed_s": 9985.3,
-      "json_file": "mistral_7b_v0.1_sdpa_fp16_20260503_154051.json"
+      "combo_elapsed_s": 5461.6,
+      "json_file": "mistral_7b_v0.1_sdpa_fp16_20260502_201246.json"
     },
     {
       "backend": "sdpa",
@@ -28,16 +28,16 @@
       "axis_value": 1,
       "asymmetric": false,
       "ctx": 32768,
-      "prefill_ms": 11534.926,
-      "decode_tok_s": 4.55,
+      "prefill_ms": 10671.322,
+      "decode_tok_s": 4.54,
       "kv_mb": 2176.0,
       "vram_peak_mb": 25357.1,
       "vram_overflow": false,
       "ppl": 4.611,
       "ppl_quant": 4.6104,
       "ppl_delta": -0.0006,
-      "combo_elapsed_s": 527.1,
-      "json_file": "mistral_7b_v0.1_sdpa_int8_hqq_20260503_154939.json"
+      "combo_elapsed_s": 495.5,
+      "json_file": "mistral_7b_v0.1_sdpa_int8_hqq_20260502_202102.json"
     },
     {
       "backend": "sdpa",
@@ -46,16 +46,16 @@
       "axis_value": 1,
       "asymmetric": false,
       "ctx": 32768,
-      "prefill_ms": 12483.563,
-      "decode_tok_s": 4.2,
+      "prefill_ms": 11512.885,
+      "decode_tok_s": 4.34,
       "kv_mb": 1152.0,
       "vram_peak_mb": 22285.1,
       "vram_overflow": false,
       "ppl": 4.611,
       "ppl_quant": 4.613,
       "ppl_delta": 0.002,
-      "combo_elapsed_s": 589.0,
-      "json_file": "mistral_7b_v0.1_sdpa_int4_hqq_20260503_155930.json"
+      "combo_elapsed_s": 548.0,
+      "json_file": "mistral_7b_v0.1_sdpa_int4_hqq_20260502_203010.json"
     },
     {
       "backend": "sdpa",
@@ -64,16 +64,16 @@
       "axis_value": 1,
       "asymmetric": false,
       "ctx": 32768,
-      "prefill_ms": 12957.284,
-      "decode_tok_s": 4.03,
+      "prefill_ms": 11795.572,
+      "decode_tok_s": 4.21,
       "kv_mb": 640.0,
       "vram_peak_mb": 20749.1,
       "vram_overflow": false,
       "ppl": 4.611,
       "ppl_quant": 4.7481,
       "ppl_delta": 0.1371,
-      "combo_elapsed_s": 618.7,
-      "json_file": "mistral_7b_v0.1_sdpa_int2_hqq_20260503_160950.json"
+      "combo_elapsed_s": 577.1,
+      "json_file": "mistral_7b_v0.1_sdpa_int2_hqq_20260502_203947.json"
     },
     {
       "backend": "sdpa",
@@ -82,16 +82,16 @@
       "axis_value": 1,
       "asymmetric": true,
       "ctx": 32768,
-      "prefill_ms": 12797.913,
-      "decode_tok_s": 4.05,
+      "prefill_ms": 11789.487,
+      "decode_tok_s": 4.21,
       "kv_mb": 640.0,
       "vram_peak_mb": 20749.1,
       "vram_overflow": false,
       "ppl": 4.611,
       "ppl_quant": 4.9786,
       "ppl_delta": 0.3676,
-      "combo_elapsed_s": 620.4,
-      "json_file": "mistral_7b_v0.1_sdpa_int2_hqq_kivi_20260503_162011.json"
+      "combo_elapsed_s": 575.8,
+      "json_file": "mistral_7b_v0.1_sdpa_int2_hqq_kivi_20260502_204923.json"
     }
   ]
 }
