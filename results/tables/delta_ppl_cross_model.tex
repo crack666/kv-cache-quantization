@@ -1,0 +1,15 @@
+\begin{table}[htbp]
+\centering
+\caption{Perplexity degradation ($\Delta$-PPL) by KV-cache quantization level at 32k context.}
+\label{tab:delta_ppl_cross_model}
+\begin{tabular}{l r r r r r}
+\toprule
+Model & PPL\textsubscript{ref} & INT8 & INT4 & INT2 & KIVI \\
+\midrule
+Mistral-7B & 4.6110 & -0.0006 & +0.0020 & +0.1371 & +0.3676 \\
+Yi-1.5-9B & 4.8505 & +0.0005 & +0.0062 & +0.2105 & +0.8748 \\
+Qwen3-8B & 8.3489 & +0.0008 & +0.2248 & +43.70 & +0.8136 \\
+Qwen2-7B & 6.2642 & +0.0004 & +3,052 & +35,926 & +2,273 \\
+\bottomrule
+\end{tabular}
+\end{table}
