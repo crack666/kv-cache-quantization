@@ -1,0 +1,305 @@
+{
+  "schema_version": "2.0",
+  "experiment_id": "gemma_4_e4b_sdpa_int4_hqq_20260503_190200",
+  "timestamp": "2026-05-03T19:02:00",
+  "model": "google/gemma-4-E4B",
+  "model_config": {
+    "num_params_b": 7.94,
+    "num_layers": 42,
+    "num_q_heads": 8,
+    "num_kv_heads": 2,
+    "gqa_ratio": "4:1",
+    "head_dim": 256,
+    "max_position_embeddings": 131072
+  },
+  "attn_backend": "sdpa",
+  "kv_quant": {
+    "enabled": true,
+    "nbits": 4,
+    "backend": "hqq",
+    "axis_key": 1,
+    "axis_value": 1,
+    "asymmetric": false,
+    "residual_length": 128
+  },
+  "environment": {
+    "python_version": "3.12.3",
+    "pytorch_version": "2.8.0+cu128",
+    "transformers_version": "5.5.4",
+    "cuda_version": "12.8",
+    "gpu_name": "NVIDIA GeForce RTX 5090",
+    "gpu_vram_gb": 34.2
+  },
+  "hardware": {
+    "vram_total_mb": 32606.6,
+    "gpu_name": "NVIDIA GeForce RTX 5090"
+  },
+  "config": {
+    "seed": 42,
+    "warmup_runs": 2,
+    "measure_runs": 5,
+    "decode_tokens": 128,
+    "ppl_dataset": "wikitext2",
+    "ppl_tokens": 4096
+  },
+  "measurements": [
+    {
+      "context_len": 512,
+      "prefill_ms": 388.141,
+      "prefill_tokens_per_sec": 1319.11,
+      "decode_ms": 8361.447,
+      "decode_tokens": 128,
+      "decode_tokens_per_sec": 15.31,
+      "vram_peak_mb": 15693.8,
+      "vram_reserved_mb": 15822.0,
+      "kv_cache_mb": 7.88,
+      "kv_cache_type": "QuantizedCache (INT4)",
+      "quant_overhead_ms": 2622.954,
+      "dequant_overhead_ms": 2071.135,
+      "overhead_pct": 53.65,
+      "avg_power_watts": 0.0,
+      "energy_mj_per_token": 0.0,
+      "ctx_elapsed_s": 26.7,
+      "vram_overflow": false
+    },
+    {
+      "context_len": 1024,
+      "prefill_ms": 406.525,
+      "prefill_tokens_per_sec": 2518.91,
+      "decode_ms": 8428.94,
+      "decode_tokens": 128,
+      "decode_tokens_per_sec": 15.19,
+      "vram_peak_mb": 16232.0,
+      "vram_reserved_mb": 16494.0,
+      "kv_cache_mb": 15.75,
+      "kv_cache_type": "QuantizedCache (INT4)",
+      "quant_overhead_ms": 2368.499,
+      "dequant_overhead_ms": 2039.09,
+      "overhead_pct": 49.89,
+      "avg_power_watts": 0.0,
+      "energy_mj_per_token": 0.0,
+      "ctx_elapsed_s": 26.4,
+      "vram_overflow": false
+    },
+    {
+      "context_len": 4096,
+      "prefill_ms": 710.249,
+      "prefill_tokens_per_sec": 5766.99,
+      "decode_ms": 9492.369,
+      "decode_tokens": 128,
+      "decode_tokens_per_sec": 13.48,
+      "vram_peak_mb": 19461.1,
+      "vram_reserved_mb": 21436.0,
+      "kv_cache_mb": 63.0,
+      "kv_cache_type": "QuantizedCache (INT4)",
+      "quant_overhead_ms": 2333.618,
+      "dequant_overhead_ms": 2316.59,
+      "overhead_pct": 45.58,
+      "avg_power_watts": 0.0,
+      "energy_mj_per_token": 0.0,
+      "ctx_elapsed_s": 30.0,
+      "vram_overflow": false
+    },
+    {
+      "context_len": 8192,
+      "prefill_ms": 1782.373,
+      "prefill_tokens_per_sec": 4596.12,
+      "decode_ms": 19097.129,
+      "decode_tokens": 128,
+      "decode_tokens_per_sec": 6.7,
+      "vram_peak_mb": 23766.1,
+      "vram_reserved_mb": 30244.0,
+      "kv_cache_mb": 126.0,
+      "kv_cache_type": "QuantizedCache (INT4)",
+      "quant_overhead_ms": 3517.08,
+      "dequant_overhead_ms": 3018.112,
+      "overhead_pct": 31.3,
+      "avg_power_watts": 0.0,
+      "energy_mj_per_token": 0.0,
+      "ctx_elapsed_s": 54.8,
+      "vram_overflow": false
+    }
+  ],
+  "benchmarks": {
+    "perplexity": {
+      "dataset": "wikitext2",
+      "tokens": 4096,
+      "value": 7.6494
+    },
+    "perplexity_quantized": {
+      "dataset": "wikitext2",
+      "tokens": 4096,
+      "value": 7.6442
+    },
+    "needle_in_haystack": {
+      "total_trials": 20,
+      "successes": 20,
+      "success_rate": 1.0,
+      "per_context": {
+        "512": {
+          "trials": 5,
+          "successes": 5,
+          "success_rate": 1.0
+        },
+        "1024": {
+          "trials": 5,
+          "successes": 5,
+          "success_rate": 1.0
+        },
+        "4096": {
+          "trials": 5,
+          "successes": 5,
+          "success_rate": 1.0
+        },
+        "8192": {
+          "trials": 5,
+          "successes": 5,
+          "success_rate": 1.0
+        }
+      }
+    },
+    "needle_in_haystack_trials": [
+      {
+        "context_length": 512,
+        "depth_percent": 0.1,
+        "input_tokens": 500,
+        "generated_text": "7492. Remember this number: 7492. There and back again. The grass is green. The sky is blue. The",
+        "success": true
+      },
+      {
+        "context_length": 512,
+        "depth_percent": 0.25,
+        "input_tokens": 500,
+        "generated_text": "7492. Remember this number: 7492. There and back again. The grass is green. The sky is blue. The",
+        "success": true
+      },
+      {
+        "context_length": 512,
+        "depth_percent": 0.5,
+        "input_tokens": 500,
+        "generated_text": "7492. Remember this number: 7492. Here we go. There and back again. The grass is green. The sky",
+        "success": true
+      },
+      {
+        "context_length": 512,
+        "depth_percent": 0.75,
+        "input_tokens": 500,
+        "generated_text": "7492. Remember this number: 7492. The sun is yellow. Here we go. There and back again. The grass",
+        "success": true
+      },
+      {
+        "context_length": 512,
+        "depth_percent": 0.9,
+        "input_tokens": 500,
+        "generated_text": "7492. Remember this number: 7492. The sun is yellow. Here we go. There and back again. The grass",
+        "success": true
+      },
+      {
+        "context_length": 1024,
+        "depth_percent": 0.1,
+        "input_tokens": 1013,
+        "generated_text": "7492. Remember this number: 7492. The grass is green. The sky is blue. The sun is yellow. Here",
+        "success": true
+      },
+      {
+        "context_length": 1024,
+        "depth_percent": 0.25,
+        "input_tokens": 1013,
+        "generated_text": "7492. Remember this number: 7492. The sky is blue. The sun is yellow. Here we go. There and",
+        "success": true
+      },
+      {
+        "context_length": 1024,
+        "depth_percent": 0.5,
+        "input_tokens": 1013,
+        "generated_text": "7492. Remember this number: 7492. The sun is yellow. Here we go. There and back again. The grass",
+        "success": true
+      },
+      {
+        "context_length": 1024,
+        "depth_percent": 0.75,
+        "input_tokens": 1013,
+        "generated_text": "7492. Remember this number: 7492. Here we go. There and back again. The grass is green. The sky",
+        "success": true
+      },
+      {
+        "context_length": 1024,
+        "depth_percent": 0.9,
+        "input_tokens": 1013,
+        "generated_text": "7492. Remember this number: 7492. Here we go. There and back again. The grass is green. The sky",
+        "success": true
+      },
+      {
+        "context_length": 4096,
+        "depth_percent": 0.1,
+        "input_tokens": 4085,
+        "generated_text": "7492. Remember this number: 7492. There and back again. The grass is green. The sky is blue. The",
+        "success": true
+      },
+      {
+        "context_length": 4096,
+        "depth_percent": 0.25,
+        "input_tokens": 4085,
+        "generated_text": "7492. Remember this number: 7492. The sky is blue. The sun is yellow. Here we go. There and",
+        "success": true
+      },
+      {
+        "context_length": 4096,
+        "depth_percent": 0.5,
+        "input_tokens": 4085,
+        "generated_text": "7492. Remember this number: 7492. The sun is yellow. Here we go. There and back again. The grass",
+        "success": true
+      },
+      {
+        "context_length": 4096,
+        "depth_percent": 0.75,
+        "input_tokens": 4085,
+        "generated_text": "7492. Remember this number: 7492. Here we go. There and back again. The grass is green. The sky",
+        "success": true
+      },
+      {
+        "context_length": 4096,
+        "depth_percent": 0.9,
+        "input_tokens": 4085,
+        "generated_text": "7492. Remember this number: 7492. There and back again. The grass is green. The sky is blue. The",
+        "success": true
+      },
+      {
+        "context_length": 8192,
+        "depth_percent": 0.1,
+        "input_tokens": 8180,
+        "generated_text": "7492. Remember this number: 7492. There and back again. The grass is green. The sky is blue. The",
+        "success": true
+      },
+      {
+        "context_length": 8192,
+        "depth_percent": 0.25,
+        "input_tokens": 8180,
+        "generated_text": "7492. Remember this number: 7492. There and back again. The grass is green. The sky is blue. The",
+        "success": true
+      },
+      {
+        "context_length": 8192,
+        "depth_percent": 0.5,
+        "input_tokens": 8180,
+        "generated_text": "7492. Remember this number: 7492. Here we go. There and back again. The grass is green. The sky",
+        "success": true
+      },
+      {
+        "context_length": 8192,
+        "depth_percent": 0.75,
+        "input_tokens": 8180,
+        "generated_text": "7492. Remember this number: 7492. The sun is yellow. Here we go. There and back again. The grass",
+        "success": true
+      },
+      {
+        "context_length": 8192,
+        "depth_percent": 0.9,
+        "input_tokens": 8180,
+        "generated_text": "7492. Remember this number: 7492. The sun is yellow. Here we go. There and back again. The grass",
+        "success": true
+      }
+    ]
+  },
+  "combo_elapsed_s": 396.6
+}
