@@ -42,12 +42,26 @@ gestrichelte Linie markiert die physische VRAM-Grenze der Testhard­ware
 (32 GB). Unten: Relative VRAM-Einsparung gegenüber FP16-Baseline in Prozent.
 
 **Befund:**  
-Die VRAM-Einsparungen durch KV-Cache-Quantisierung sind stark modellabhängig
-und spiegeln die architekturellen Unterschiede direkt wider. Gemma-4-E4B
+Der KV-Cache selbst skaliert nahezu exakt wie theoretisch erwartet: INT8
+halbiert, INT4 viertelt, INT2 achtelt den Speicherbedarf gegenüber FP16.
+Die gemessenen Werte für Gemma ctx=8192 belegen dies — FP16: 448 MB,
+INT8: 238 MB (×0,53), INT4: 126 MB (×0,28), INT2: 70 MB (×0,16).
+Die leichte Abweichung vom theoretischen Faktor entsteht durch zwei Mechanismen:
+(1) HQQ speichert pro Quantisierungsgruppe Skalierungsfaktoren und Zero-Points als
+Metadaten, (2) die letzten 128 Tokens je Layer verbleiben als *Residual Buffer*
+immer in FP16, da die jüngsten Tokens am häufigsten in der Attention genutzt werden
+und Quantisierungsfehler dort direkt die Ausgabequalität beeinflussen würden.
+Der übrige quantisierte Cache bleibt dauerhaft komprimiert im VRAM; für jede
+Attention-Operation wird on-the-fly in FP16 dequantisiert, die temporäre Kopie
+nach der Berechnung sofort verworfen.
+
+Trotz der linearen KV-Cache-Skalierung sind die Gesamt-VRAM-Einsparungen deutlich
+geringer, da die Modellgewichte (~16 GB, dauerhaft in FP16) den dominanten VRAM-Block
+bilden. Die tatsächlichen Einsparungen sind daher stark modellabhängig und skalieren
+mit dem Verhältnis KV-Cache zu Gesamtspeicher. Gemma-4-E4B
 profitiert kaum: INT2 spart lediglich 4,6 % (24,2 → 23,0 GB), da der
-KV-Cache bei 8 192 Tokens einen kleinen Anteil am Gesamt-VRAM ausmacht und
-die nahezu normalverteilten Key-Tensoren keinen nennenswerten Kompressionsgewinn
-ermöglichen. Mistral-7B hingegen zeigt bei 32k Tokens ausgeprägte Einsparungen:
+KV-Cache bei 8 192 Tokens nur ~1,9 % des Gesamt-VRAM ausmacht.
+Mistral-7B hingegen zeigt bei 32k Tokens ausgeprägte Einsparungen:
 INT8 −18 %, INT4 −28 %, INT2 −33 % (30,3 → 20,3 GB). Ähnlich starke Effekte
 zeigen Yi-1.5-9B (INT2: −26 %) und Qwen3-8B (INT2: −30 %). Qwen3-8B
 überschreitet bei FP16 und 32k Tokens die 32-GB-Grenze der Testhardware
