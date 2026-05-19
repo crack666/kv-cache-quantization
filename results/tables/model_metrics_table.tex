@@ -1,0 +1,16 @@
+\begin{table}[htbp]
+\centering
+\caption{Modellarchitektur und Kurtosis-Kennzahlen}
+\label{tab:model_metrics}
+\begin{tabular}{|p{2.2cm}|r|r|r|r|r|r|r|r|}
+\toprule
+\textbf{Modell} & \textbf{Param. (B)} & \textbf{Layers} & \textbf{KV-Heads} & \textbf{GQA} & \textbf{$d_h$} & \textbf{$\bar{\kappa}_K$} & \textbf{$\kappa_{K,\max}$} & \textbf{$\bar{\kappa}_V$} \\
+\midrule
+Gemma-4-E4B & 7.94 & 42 & 2 & 4:1 & 256 & 0.92 & 2.02 & 0.03 \\
+Mistral-7B & 7.24 & 32 & 8 & 4:1 & 128 & 7.12 & 12.49 & 3.58 \\
+Yi-1.5-9B & 8.83 & 48 & 4 & 8:1 & 128 & 8.77 & 16.47 & 2.57 \\
+Qwen2-7B & 7.62 & 28 & 4 & 7:1 & 128 & 19.57 & 103.53 & 2.72 \\
+Qwen3-8B & 8.19 & 36 & 8 & 4:1 & 128 & 23.01 & 148.74 & 10.88 \\
+\bottomrule
+\end{tabular}
+\end{table}
