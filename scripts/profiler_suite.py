@@ -104,7 +104,8 @@ def build_parser() -> argparse.ArgumentParser:
     # Measurement
     p.add_argument("--warmup-runs", type=int, default=2)
     p.add_argument("--measure-runs", type=int, default=5)
-    p.add_argument("--measure-power", action="store_true", help="Enable GPU power sampling")
+    p.add_argument("--no-measure-power", action="store_true",
+                   help="Disable GPU power sampling (enabled by default on CUDA)")
     p.add_argument("--decode-tokens", type=int, default=128, help="Tokens to generate for decode throughput")
 
     # Output
@@ -228,7 +229,7 @@ def run_single_combination(
 
     # Power sampler (lazy import)
     power_ctx = None
-    if args.measure_power and args.device == "cuda":
+    if not args.no_measure_power and args.device == "cuda":
         from core.power_sampler import PowerSampler
         power_ctx = PowerSampler(handle=profiler.handle if profiler else None)
 
@@ -267,10 +268,6 @@ def run_single_combination(
             torch.cuda.reset_peak_memory_stats()
         reset_timings()
 
-        # Start power sampling
-        if power_ctx:
-            power_ctx.start()
-
         # Prefill
         prefill = measure_prefill_latency(
             model, input_ids, past_key_values=cache, warmup_runs=args.warmup_runs
@@ -302,6 +299,10 @@ def run_single_combination(
             with torch.no_grad():
                 out = _model(_ids, past_key_values=c, use_cache=True)
             return out.past_key_values
+
+        # Start power sampling (decode-only for accurate energy_mj_per_token)
+        if power_ctx:
+            power_ctx.start()
 
         decode = measure_decode_throughput(
             model,

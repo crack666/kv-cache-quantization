@@ -118,14 +118,17 @@ def capture_kv_from_cache(model, input_ids, device):
 # Statistical Analysis
 # ═══════════════════════════════════════════════════════════════════════════
 
-def compute_tensor_stats(tensor: torch.Tensor) -> dict:
+def compute_tensor_stats(tensor: torch.Tensor, histogram_bins: int = 0) -> dict:
     """Compute distribution statistics for a KV tensor.
 
     Args:
         tensor: Shape [batch, heads, seq_len, head_dim]
+        histogram_bins: If > 0, compute a z-scored histogram over [-6, 6]
+                        and store bin edges + counts in the output dict.
 
     Returns:
-        dict with kurtosis, outlier ratios, dynamic range, variance ratios.
+        dict with kurtosis, outlier ratios, dynamic range, variance ratios,
+        and optionally a 'histogram' sub-dict.
     """
     t = tensor.flatten().float()
 
@@ -161,7 +164,7 @@ def compute_tensor_stats(tensor: torch.Tensor) -> dict:
         per_token_var = 0.0
         variance_ratio = 0.0
 
-    return {
+    result = {
         "mean": round(mean, 6),
         "std": round(std, 6),
         "min": round(t.min().item(), 6),
@@ -176,11 +179,27 @@ def compute_tensor_stats(tensor: torch.Tensor) -> dict:
         "numel": n,
     }
 
+    if histogram_bins > 0 and std > 0:
+        # Z-score the values and bin over [-6, 6] for cross-model comparability
+        z = ((t - mean) / std).numpy()
+        counts, edges = np.histogram(z, bins=histogram_bins, range=(-6.0, 6.0))
+        # Normalize to probability density
+        bin_width = edges[1] - edges[0]
+        density = (counts / (counts.sum() * bin_width)).tolist()
+        # Store bin centers (not edges) for direct plotting
+        centers = ((edges[:-1] + edges[1:]) / 2).tolist()
+        result["histogram"] = {
+            "bin_centers": [round(c, 4) for c in centers],
+            "density": [round(d, 6) for d in density],
+        }
 
-def analyze_layer(layer_idx: int, kv: dict) -> dict:
+    return result
+
+
+def analyze_layer(layer_idx: int, kv: dict, histogram_bins: int = 0) -> dict:
     """Analyze K and V tensors for a single layer."""
-    k_stats = compute_tensor_stats(kv["key"])
-    v_stats = compute_tensor_stats(kv["value"])
+    k_stats = compute_tensor_stats(kv["key"], histogram_bins=histogram_bins)
+    v_stats = compute_tensor_stats(kv["value"], histogram_bins=histogram_bins)
 
     return {
         "layer": layer_idx,
@@ -202,6 +221,10 @@ def build_parser():
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--device", default="cuda")
     p.add_argument("--output-dir", default="../results/raw/kv_distributions/")
+    p.add_argument(
+        "--histogram-bins", type=int, default=200,
+        help="Number of histogram bins for z-scored distribution (0 = skip). Default: 200"
+    )
     return p
 
 
@@ -257,9 +280,11 @@ def main():
 
     # Analyze each layer
     print("\nAnalyzing distributions...")
+    if args.histogram_bins > 0:
+        print(f"  Histogram bins: {args.histogram_bins} (z-scored, range [-6, 6])")
     layer_stats = []
     for layer_idx in sorted(kv_data.keys()):
-        stats = analyze_layer(layer_idx, kv_data[layer_idx])
+        stats = analyze_layer(layer_idx, kv_data[layer_idx], histogram_bins=args.histogram_bins)
         layer_stats.append(stats)
 
         # Print compact summary
@@ -317,6 +342,7 @@ def main():
             "max_tokens": actual_len,
             "seed": args.seed,
             "dataset": "wikitext-2-raw-v1",
+            "histogram_bins": args.histogram_bins,
         },
         "summary": summary,
         "layers": layer_stats,

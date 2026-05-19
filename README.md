@@ -86,9 +86,19 @@ python scripts/profiler_suite.py --model gpt2 --context-lengths 128 256
 ```
 
 **Output:** One JSON per (backend × kv-quant) combination containing:
-- Measurements per context length (prefill, decode, VRAM, KV size)
+- Measurements per context length (prefill, decode, VRAM, KV size, power)
 - Perplexity (reference + quantized + delta)
 - Needle-in-a-Haystack trials (per depth × context length)
+
+### Power Measurement
+
+GPU power sampling via NVML is **enabled by default** on CUDA devices. A background thread samples `nvmlDeviceGetPowerUsage()` at 20 Hz during decode — the overhead is negligible (<0.1% CPU, no GPU impact).
+
+Output fields per context length:
+- `avg_power_watts` — mean GPU power draw during decode (Watts)
+- `energy_mj_per_token` — energy per generated token (millijoules)
+
+To disable (e.g. on systems without NVML): `--no-measure-power`
 
 ### 3. Patch Benchmarks (re-run without re-profiling)
 
@@ -141,6 +151,27 @@ Tests whether KV-cache quantization destroys long-range retrieval ability.
 - **Prompt**: `"The special magic number for this experiment is"` (model completes)
 - **Scoring**: Case-insensitive string match (`"7492" in output`)
 - **Reference**: Hsieh et al. (2024), "RULER", COLM 2024
+
+---
+
+## CLI Reference (`profiler_suite.py`)
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--model` | *(required)* | HuggingFace model ID or local path |
+| `--attn-backend` | `sdpa` | Attention backend(s): `sdpa`, `eager`, `sage` |
+| `--kv-quant` | `none` | Quant config(s): `none`, `int8-hqq`, `int4-hqq`, `int2-hqq`, `int2-hqq-kivi` |
+| `--context-lengths` | `512 1024 4096` | Context lengths to profile |
+| `--benchmarks` | *(none)* | Benchmarks to run: `ppl`, `needle` |
+| `--warmup-runs` | `2` | Warmup iterations before measuring |
+| `--measure-runs` | `5` | Timed measurement iterations |
+| `--decode-tokens` | `128` | Tokens to generate for decode throughput |
+| `--no-measure-power` | `false` | Disable GPU power sampling |
+| `--residual-length` | `128` | FP16 residual buffer length (KIVI) |
+| `--output-dir` | `results/raw/` | Output directory for JSON files |
+| `--summary-file` | *(none)* | Compact summary JSON path |
+| `--patch` | *(none)* | Patch existing JSON(s) with new benchmarks |
+| `--seed` | `42` | Random seed for reproducibility |
 
 ---
 

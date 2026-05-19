@@ -171,3 +171,51 @@ Im rechten Panel sind die Qwen-Modelle trotz ähnlicher mittlerer Kurtosis
 50. Die Aufteilung in zwei Panels mit explizit unterschiedlichen y-Achsen
 ist notwendig, da Qwen2 und Qwen3 die für die anderen Modelle relevante
 Anzeigeregion um den Faktor 8–10 überschreiten würden.
+
+---
+
+## Abbildung 7 — Key-Aktivierungsverteilungen: Normalverteilungsvergleich
+
+![Abb. 7](kv_key_distributions.png)
+
+**Abbildungsbeschriftung:**  
+Gemittelte empirische Dichtefunktion der z-normierten Key-Aktivierungswerte
+im KV-Cache, über alle Layer je Modell gemittelt (1 Forward-Pass, WikiText-2,
+4 096 Tokens, 200 Bins in [−6, 6]). Die gestrichelte schwarze Kurve zeigt
+die theoretische Normalverteilung N(0,1) als Referenz.
+Linkes Panel: lineare Dichteskala — sichtbar ist die Peakschärfe.
+Rechtes Panel: logarithmische Dichteskala — sichtbar ist die Randbesetzung
+bei großen z-Werten (|z| > 2).
+
+**Was zeigt die Log-Skala?**  
+Auf der linearen Skala erscheinen alle Modelle ähnlich: der Peak liegt nahe
+z = 0, die Kurven überlagern sich stark. Erst die Log-Skala trennt die
+Modelle klar: Eine echte Normalverteilung fällt als Parabel ab
+(d. h. die Dichte nimmt quadratisch mit zunehmendem |z| ab). Modelle
+mit hoher Kurtosis liegen bei |z| ≈ 3–5 *über* der gestrichelten Referenz —
+in den Extremwertbereichen ist mehr Masse konzentriert als bei N(0,1).
+Diese seltenen, aber sehr großen Aktivierungswerte zwingen das
+Quantisierungsgitter, einen weit größeren Wertebereich abzudecken, und
+reduzieren so die Auflösung für die kompakte Masse nahe z = 0.
+
+**Befund:**  
+Gemma-4-E4B (rot) folgt der Gaußglocke am nächsten — sowohl im Peak (linkes
+Panel: breites, flaches Profil nahe N(0,1)) als auch in den Extremwertbereichen
+(rechtes Panel: Kurve bleibt nahe an der gestrichelten Parabel bis |z| ≈ 4).
+Alle anderen Modelle zeigen schärfere Peaks und stärker besetzte Extrembereiche:
+Mistral-7B und Yi-1.5-9B liegen moderat über der Referenz, Qwen2-7B
+(violett) und Qwen3-8B (orange) weichen am stärksten ab — ihre Kurven
+liegen im rechten Panel bei z = 3 um mehr als eine Größenordnung über der
+Gaußreferenz.
+
+Der Befund für Gemma-4-E4B ist dabei zweischneidig: Die annähernd
+gaußförmige Werteverteilung führt zwar dazu, dass Quantisierung keine
+messbare Qualitätsverschlechterung verursacht (|Δ-PPL| < 0,001 selbst bei
+INT2). Gleichzeitig ist der KV-Cache-Anteil am Gesamt-VRAM bei ctx=8 192
+so gering (~1,9 %), dass auch die erreichbare Speichereinsparung minimal
+bleibt (INT2 spart absolut nur ~1,2 GB). Quantisierung hat bei Gemma-4-E4B
+in dieser Konfiguration kaum Wirkung — weder positiv noch negativ. Das
+Modell steht damit exemplarisch für die Grenzen von KV-Cache-Quantisierung
+bei kompakten Architekturen mit kurzen Kontextfenstern, während die Methode
+bei langkontextigem Betrieb (Mistral-7B, Qwen3-8B) ihren eigentlichen Nutzen
+entfaltet.

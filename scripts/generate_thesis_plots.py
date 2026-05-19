@@ -25,7 +25,7 @@ import numpy as np
 # ── Paths ─────────────────────────────────────────────────────────────────────
 BASE = Path(__file__).parent.parent
 LONG_CTX = BASE / "results/raw/long_context"
-KV_DIST  = BASE / "results/raw/kv_distributions"
+KV_DIST  = BASE / "results/raw/kv_distributions_v2"
 OUT_DIR  = BASE / "results/figures/thesis"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -673,6 +673,104 @@ def plot_kurtosis_violin(kv_dists_raw):
     plt.close(fig)
 
 
+def plot_kv_key_distributions(kv_dists_raw):
+    """Abbildung 7 — Key-Aktivierungsverteilungen: Linear (links) + Log-Skala (rechts).
+
+    Zwei Panels zeigen die gemessenen Key-Histogramme vs. N(0,1)-Referenz.
+    Log-Skala macht Schwanz-Unterschiede sichtbar: Gausssche Parabel vs. Heavy Tails.
+    """
+    from scipy.stats import norm as scipy_norm
+
+    # Colors chosen for maximum contrast (overrides global MODEL_COLORS here)
+    DIST_COLORS = {
+        "Gemma-4-E4B": "#E63946",   # kräftiges Rot
+        "Mistral-7B":  "#1D6FA4",   # Blau
+        "Yi-1.5-9B":   "#2A9D8F",   # Teal
+        "Qwen2-7B":    "#7B2D8B",   # Violett
+        "Qwen3-8B":    "#F4830A",   # Orange
+    }
+
+    # Collect models that have histogram data
+    models_with_hist = []
+    for label, d in kv_dists_raw.items():
+        layers = d.get("layers", [])
+        if layers and "histogram" in layers[0].get("key", {}):
+            models_with_hist.append(label)
+
+    if not models_with_hist:
+        print("  [plot_kv_key_distributions] No histogram data found — skipping. "
+              "Re-run analyze_kv_distributions.py with --histogram-bins 200.")
+        return
+
+    # Sort by mean kurtosis (low → high) so Gemma appears first / lowest
+    models_with_hist.sort(
+        key=lambda m: kv_dists_raw[m]["summary"]["key_kurtosis_mean"]
+    )
+
+    fig, (ax_lin, ax_log) = plt.subplots(1, 2, figsize=(12, 4.5),
+                                          gridspec_kw={"wspace": 0.28})
+
+    x_ref = np.linspace(-6, 6, 600)
+    gauss_pdf = scipy_norm.pdf(x_ref)
+
+    for ax, yscale in [(ax_lin, "linear"), (ax_log, "log")]:
+        # Reference Gaussian
+        ax.plot(x_ref, gauss_pdf, color="black", lw=1.6,
+                linestyle="--", label="N(0,1) Referenz", zorder=5)
+
+        for label in models_with_hist:
+            d = kv_dists_raw[label]
+            layers = d["layers"]
+            kurtosis_mean = d["summary"]["key_kurtosis_mean"]
+            color = DIST_COLORS.get(label, "#888888")
+
+            all_densities = np.array(
+                [layer["key"]["histogram"]["density"] for layer in layers]
+            )
+            mean_density = all_densities.mean(axis=0)
+            bin_centers = np.array(layers[0]["key"]["histogram"]["bin_centers"])
+
+            ax.plot(
+                bin_centers, mean_density,
+                color=color, lw=1.9, alpha=0.82,
+                label=f"{label}  (κ̄={kurtosis_mean:.1f})",
+            )
+
+        ax.set_xlim(-5.2, 5.2)
+        ax.set_xlabel("z-normierter Key-Wert  (x − μ) / σ", fontsize=9.5)
+        ax.tick_params(labelsize=8.5)
+
+        if yscale == "log":
+            ax.set_yscale("log")
+            ax.set_ylim(5e-4, 2.0)
+            ax.set_ylabel("Dichte (log)", fontsize=9.5)
+            ax.set_title("Log-Skala — Schwanz-Verhalten", fontsize=10)
+            # Annotate where heavy tails diverge from Gaussian
+            ax.annotate(
+                "Heavy Tails:\nModelle > N(0,1)",
+                xy=(2.8, 8e-3), xytext=(3.5, 0.06),
+                fontsize=7.5, color="#555555",
+                arrowprops=dict(arrowstyle="->", color="#888", lw=0.8),
+                ha="center",
+            )
+        else:
+            ax.set_ylim(bottom=0)
+            ax.set_ylabel("Wahrscheinlichkeitsdichte", fontsize=9.5)
+            ax.set_title("Lineare Skala — Peakform", fontsize=10)
+
+    # Single shared legend on the right panel
+    ax_log.legend(fontsize=8, framealpha=0.92, loc="lower center",
+                  bbox_to_anchor=(0.5, 0.01))
+
+    fig.suptitle(
+        "Key-Aktivierungsverteilungen im KV-Cache (alle Layer gemittelt, z-normiert)",
+        fontsize=11, y=1.01,
+    )
+    fig.tight_layout()
+    save_fig(fig, "kv_key_distributions.pdf", 7)
+    plt.close(fig)
+
+
 # ── Main ───────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
@@ -698,6 +796,7 @@ if __name__ == "__main__":
     plot_needle_comparison(summaries)
     plot_layer_kurtosis(kv_dists_raw)
     plot_kurtosis_violin(kv_dists_raw)
+    plot_kv_key_distributions(kv_dists_raw)
 
     print()
     print(f"All plots saved to: {OUT_DIR}")
