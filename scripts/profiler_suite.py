@@ -270,7 +270,8 @@ def run_single_combination(
 
         # Prefill
         prefill = measure_prefill_latency(
-            model, input_ids, past_key_values=cache, warmup_runs=args.warmup_runs
+            model, input_ids, past_key_values=cache, warmup_runs=args.warmup_runs,
+            measure_runs=args.measure_runs,
         )
         filled_cache = prefill["past_key_values"]
 
@@ -311,6 +312,7 @@ def run_single_combination(
             past_key_values=filled_cache,
             warmup_runs=args.warmup_runs,
             prefill_fn=_re_prefill,
+            measure_runs=args.measure_runs,
         )
 
         # VRAM peak + overflow detection
@@ -349,8 +351,12 @@ def run_single_combination(
         m = {
             "context_len": actual_len,
             "prefill_ms": prefill["prefill_ms"],
+            "prefill_ms_runs": prefill.get("prefill_ms_runs"),
+            "prefill_n_runs": prefill.get("n_runs"),
             "prefill_tokens_per_sec": prefill["tokens_per_sec"],
             "decode_ms": decode["decode_ms"],
+            "decode_ms_runs": decode.get("decode_ms_runs"),
+            "decode_n_runs": decode.get("n_runs"),
             "decode_tokens": decode["tokens"],
             "decode_tokens_per_sec": decode["tokens_per_sec"],
             "vram_peak_mb": round(vram_peak_mb, 1),

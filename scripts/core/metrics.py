@@ -6,6 +6,7 @@ in the profiler_suite orchestrator.
 """
 
 import copy
+import statistics
 from typing import Dict
 
 import torch
@@ -32,6 +33,7 @@ def measure_prefill_latency(
     input_ids: torch.Tensor,
     past_key_values=None,
     warmup_runs: int = 2,
+    measure_runs: int = 1,
 ) -> Dict:
     """Measure prefill (prompt-processing) latency with CUDA events.
 
@@ -40,10 +42,16 @@ def measure_prefill_latency(
         input_ids: ``[batch, seq_len]`` tensor on the model device.
         past_key_values: Optional pre-initialised cache object.
         warmup_runs: Number of untimed warm-up iterations.
+        measure_runs: Number of timed runs; the reported latency is the
+            median.  Extra (non-final) runs use cache copies so the
+            original cache is only mutated once.  If the cache cannot
+            be copied (e.g. quanto), extra runs are skipped and the
+            effective run count is reported in ``n_runs``.
 
     Returns:
-        dict with ``prefill_ms``, ``tokens``, ``tokens_per_sec``, and
-        the ``past_key_values`` produced by the timed run.
+        dict with ``prefill_ms`` (median), ``prefill_ms_runs`` (all
+        timed runs), ``n_runs``, ``tokens``, ``tokens_per_sec``, and
+        the ``past_key_values`` produced by the final timed run.
     """
 
     # Warm-up (use copies so the original cache is not mutated)
@@ -52,23 +60,38 @@ def measure_prefill_latency(
             model(input_ids, past_key_values=_safe_cache_copy(past_key_values), use_cache=True)
         torch.cuda.synchronize()
 
-    # Timed run
-    start = torch.cuda.Event(enable_timing=True)
-    end = torch.cuda.Event(enable_timing=True)
+    def _timed_forward(cache):
+        start = torch.cuda.Event(enable_timing=True)
+        end = torch.cuda.Event(enable_timing=True)
+        torch.cuda.synchronize()
+        start.record()
+        with torch.no_grad():
+            out = model(input_ids, past_key_values=cache, use_cache=True)
+        end.record()
+        torch.cuda.synchronize()
+        return start.elapsed_time(end), out
 
-    torch.cuda.synchronize()
-    start.record()
-    with torch.no_grad():
-        outputs = model(input_ids, past_key_values=past_key_values, use_cache=True)
-    end.record()
-    torch.cuda.synchronize()
+    times = []
+    # Extra runs on cache copies (skipped when the cache is not copyable)
+    for _ in range(max(measure_runs - 1, 0)):
+        cache_copy = _safe_cache_copy(past_key_values)
+        if cache_copy is None and past_key_values is not None:
+            continue  # cannot repeat without mutating the real cache
+        elapsed, _ = _timed_forward(cache_copy)
+        times.append(elapsed)
 
-    elapsed_ms = start.elapsed_time(end)
+    # Final run on the real cache (its outputs are returned)
+    elapsed, outputs = _timed_forward(past_key_values)
+    times.append(elapsed)
+
+    median_ms = statistics.median(times)
     n_tokens = input_ids.shape[-1]
-    tokens_per_sec = (n_tokens / elapsed_ms) * 1000 if elapsed_ms > 0 else 0.0
+    tokens_per_sec = (n_tokens / median_ms) * 1000 if median_ms > 0 else 0.0
 
     return {
-        "prefill_ms": round(elapsed_ms, 3),
+        "prefill_ms": round(median_ms, 3),
+        "prefill_ms_runs": [round(t, 3) for t in times],
+        "n_runs": len(times),
         "tokens": n_tokens,
         "tokens_per_sec": round(tokens_per_sec, 2),
         "past_key_values": outputs.past_key_values,
@@ -82,6 +105,7 @@ def measure_decode_throughput(
     past_key_values=None,
     warmup_runs: int = 2,
     prefill_fn=None,
+    measure_runs: int = 1,
 ) -> Dict:
     """Measure auto-regressive decode throughput with CUDA events.
 
@@ -97,9 +121,12 @@ def measure_decode_throughput(
         prefill_fn: Optional callable ``() -> cache`` that re-creates a
             filled cache.  Used when deepcopy of the cache is not possible
             (e.g. quanto).
+        measure_runs: Number of timed decode loops; the reported timing
+            is the median.
 
     Returns:
-        dict with ``decode_ms``, ``tokens``, ``tokens_per_sec``.
+        dict with ``decode_ms`` (median), ``decode_ms_runs``, ``n_runs``,
+        ``tokens``, ``tokens_per_sec``.
     """
 
     def _decode_loop(inp, cache):
@@ -127,21 +154,26 @@ def measure_decode_throughput(
         _decode_loop(input_ids, _get_cache_for_run())
         torch.cuda.synchronize()
 
-    # Timed run
-    start = torch.cuda.Event(enable_timing=True)
-    end = torch.cuda.Event(enable_timing=True)
+    # Timed runs (median)
+    times = []
+    for _ in range(max(measure_runs, 1)):
+        start = torch.cuda.Event(enable_timing=True)
+        end = torch.cuda.Event(enable_timing=True)
 
-    torch.cuda.synchronize()
-    start.record()
-    _decode_loop(input_ids, _get_cache_for_run())
-    end.record()
-    torch.cuda.synchronize()
+        torch.cuda.synchronize()
+        start.record()
+        _decode_loop(input_ids, _get_cache_for_run())
+        end.record()
+        torch.cuda.synchronize()
+        times.append(start.elapsed_time(end))
 
-    elapsed_ms = start.elapsed_time(end)
-    tokens_per_sec = (n_tokens / elapsed_ms) * 1000 if elapsed_ms > 0 else 0.0
+    median_ms = statistics.median(times)
+    tokens_per_sec = (n_tokens / median_ms) * 1000 if median_ms > 0 else 0.0
 
     return {
-        "decode_ms": round(elapsed_ms, 3),
+        "decode_ms": round(median_ms, 3),
+        "decode_ms_runs": [round(t, 3) for t in times],
+        "n_runs": len(times),
         "tokens": n_tokens,
         "tokens_per_sec": round(tokens_per_sec, 2),
     }
