@@ -3,7 +3,7 @@
 Alle Abbildungen wurden aus den Profiling-Ergebnissen der Phase-B-Messung
 (5 Modelle, WikiText-2-Perplexität, RULER Needle-in-a-Haystack) sowie der
 KV-Verteilungsanalyse (je Modell 1 Forward-Pass bei 4 096 Tokens) generiert.
-Hardware: NVIDIA RTX 5090 (32 GB GDDR7), PyTorch 2.8, Transformers 4.57.
+Hardware: NVIDIA RTX 5090 (32 GB GDDR7), PyTorch 2.8, Transformers 5.5.4.
 
 ---
 
@@ -99,18 +99,18 @@ für alle Modelle schlechter ab als HQQ bei gleicher Bitbreite.
 
 **Abbildungsbeschriftung:**  
 Erfolgsrate (%) des Needle-in-a-Haystack-Retrieval-Tests (RULER-Rauschen,
-20 Proben je Konfiguration) für alle Modell-Quantisierungs-Kombinationen.
-Getestet bei der höchsten verfügbaren Kontextlänge je Modell.
+20 Proben je Konfiguration) für alle Modell-Quantisierungs-Kombinationen,
+aggregiert über alle gemessenen Kontextlängen.
 
 **Befund:**  
 Die Needle-Ergebnisse korrelieren nur teilweise mit der PPL-Degradation.
-Qwen2-7B erzielt mit FP16 bereits 0 % (außerhalb des trainierten Kontextfensters),
-was auf ein fundamentales Generalisierungsproblem hinweist, das durch
-Quantisierung nicht verursacht wird. Yi-1.5-9B erreicht bei seinem
-maximalen Trainings-Kontextfenster (4 096 Tokens) 100 %, versagt aber
-ab 8 192 Tokens. Gemma-4-E4B und Qwen3-8B erreichen 100 % in allen
-Quantisierungsstufen, was die hohe Qualitätssicherung dieser Modelle
-im Long-Context-Bereich unterstreicht.
+Qwen2-7B erreicht bei FP16/INT8 volle 100 %, kollabiert aber bei INT4/INT2/KIVI
+auf 0 % — der Retrieval-Kollaps folgt exakt dem PPL-Kollaps. Mistral-7B ist
+quantisierungsrobust (50 % identisch über FP16–INT2; Degradation mit der
+Kontextlänge ist ein SWA-Modell-Limit), nur KIVI senkt auf 35 %. Yi-1.5-9B
+erreicht 100 % bis 8 192 Tokens und bricht ab 16 384 ein (trainiertes
+Kontextfenster: 4 096). Gemma-4-E4B und Qwen3-8B erreichen 100 % in allen
+Quantisierungsstufen — Qwen3 sogar bei INT2 trotz PPL-Kollaps auf 52.
 
 ---
 
