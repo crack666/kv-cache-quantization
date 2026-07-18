@@ -56,6 +56,8 @@ def compute_perplexity(
 
     nlls = []
     prev_end = 0
+    n_windows = max(1, -(-(seq_len - max_tokens) // stride) + 1) if seq_len > max_tokens else 1
+    window_idx = 0
     for begin in range(0, seq_len, stride):
         end = min(begin + max_tokens, seq_len)
         target_len = end - prev_end  # only score new tokens
@@ -104,6 +106,9 @@ def compute_perplexity(
 
         nlls.append(neg_log_likelihood if isinstance(neg_log_likelihood, float) else neg_log_likelihood.item())
         prev_end = end
+        window_idx += 1
+        if window_idx % 50 == 0:
+            print(f"    ppl window {window_idx}/{n_windows}", flush=True)
         if end == seq_len:
             break
 

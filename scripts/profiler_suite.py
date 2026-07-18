@@ -46,7 +46,7 @@ from core.kv_cache import (
     get_timings,
 )
 from core.vram_profiler import VRAMProfiler
-from core.metrics import measure_prefill_latency, measure_decode_throughput
+from core.metrics import measure_prefill_latency, measure_decode_throughput, PrefillOverflowError
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -104,6 +104,18 @@ def build_parser() -> argparse.ArgumentParser:
     # Measurement
     p.add_argument("--warmup-runs", type=int, default=2)
     p.add_argument("--measure-runs", type=int, default=5)
+    p.add_argument("--decode-measure-runs", type=int, default=1,
+                   help="Timed Decode-Wiederholungen. Default 1: Wiederholungen "
+                        "laufen auf Cache-DEEPCOPIES (2x KV gleichzeitig!) und "
+                        "können randvolle Karten physisch in den PCIe-Swap drücken. "
+                        "128 Decode-Schritte sind bereits ein stabiles Aggregat.")
+    p.add_argument("--prefill-timeout", type=float, default=120.0,
+                   help="Prefill-Guard: Kontext abbrechen, wenn der erste Warmup länger dauert (Sekunden; 0 = aus)")
+    p.add_argument("--no-kernel-probe", action="store_true",
+                   help="SDPA-Kernel-Verifikation nach Modell-Load überspringen")
+    p.add_argument("--full-logits", action="store_true",
+                   help="Prefill mit Logits für ALLE Positionen (Legacy-Protokoll "
+                        "vor 2026-07-17). Default: logits_to_keep=1 wie generate().")
     p.add_argument("--no-measure-power", action="store_true",
                    help="Disable GPU power sampling (enabled by default on CUDA)")
     p.add_argument("--decode-tokens", type=int, default=128, help="Tokens to generate for decode throughput")
@@ -227,6 +239,18 @@ def run_single_combination(
     if profiler:
         profiler.log_vram("model_loaded")
 
+    # SDPA-Kernel-Verifikation (Fix 2026-07-18): "sdpa" konfiguriert heißt
+    # nicht "optimierter Kernel läuft". Gemma-4-E4B fiel in den 7 Full-
+    # Attention-Layern (head_dim 512 + enable_gqa) still auf Math zurück
+    # (21 GB/Layer @16k). Die Probe macht den effektiven Kernel messbar.
+    sdpa_kernel_probe = None
+    if attn_backend == "sdpa" and args.device == "cuda" and not args.no_kernel_probe:
+        from core.kernel_probe import probe_sdpa_kernels
+        try:
+            sdpa_kernel_probe = probe_sdpa_kernels(model, device=args.device)
+        except Exception as e:
+            print(f"  Kernel-Probe fehlgeschlagen (übersprungen): {e}")
+
     # Power sampler (lazy import)
     power_ctx = None
     if not args.no_measure_power and args.device == "cuda":
@@ -268,65 +292,107 @@ def run_single_combination(
             torch.cuda.reset_peak_memory_stats()
         reset_timings()
 
-        # Prefill
-        prefill = measure_prefill_latency(
-            model, input_ids, past_key_values=cache, warmup_runs=args.warmup_runs,
-            measure_runs=args.measure_runs,
-        )
-        filled_cache = prefill["past_key_values"]
+        # Prefill + Decode — OOM-/Guard-sicher PRO KONTEXT (Fix 2026-07-18):
+        # Ein Overflow bei z.B. 32k darf die bereits gemessenen kleineren
+        # Kontexte nicht mehr verwerfen (Datenverlust Gemma-Run 2026-07-17,
+        # als das try/except noch die ganze Combo umschloss).
+        try:
+            # Prefill
+            prefill = measure_prefill_latency(
+                model, input_ids, past_key_values=cache, warmup_runs=args.warmup_runs,
+                measure_runs=args.measure_runs, full_logits=args.full_logits,
+                vram_budget_mb=vram_total_mb, warmup_timeout_s=args.prefill_timeout,
+            )
+            filled_cache = prefill["past_key_values"]
 
-        # KV-cache size
-        kv_mb, kv_type = measure_kv_cache_size(filled_cache)
+            # KV-cache size
+            kv_mb, kv_type = measure_kv_cache_size(filled_cache)
 
-        # Decode throughput
-        # Use last token as decode prompt
-        last_token = input_ids[:, -1:]
+            # Decode throughput
+            # Use last token as decode prompt
+            last_token = input_ids[:, -1:]
 
-        # Build a prefill_fn for caches that can't be deepcopied (e.g. quanto)
-        def _re_prefill(_ids=input_ids, _kv_cfg=kv_cfg, _model=model, _tcfg=info["text_config"]):
-            if _kv_cfg["enabled"]:
-                from transformers import QuantizedCache
-                c = QuantizedCache(
-                    backend=_kv_cfg["backend"],
-                    config=_tcfg,
-                    nbits=_kv_cfg["nbits"],
-                    axis_key=_kv_cfg["axis_key"],
-                    axis_value=_kv_cfg["axis_value"],
-                    residual_length=_kv_cfg["residual_length"],
-                )
-            else:
-                from transformers import DynamicCache
-                c = DynamicCache()
-            with torch.no_grad():
-                out = _model(_ids, past_key_values=c, use_cache=True)
-            return out.past_key_values
+            # Build a prefill_fn for caches that can't be deepcopied (e.g. quanto)
+            def _re_prefill(_ids=input_ids, _kv_cfg=kv_cfg, _model=model, _tcfg=info["text_config"]):
+                if _kv_cfg["enabled"]:
+                    from transformers import QuantizedCache
+                    c = QuantizedCache(
+                        backend=_kv_cfg["backend"],
+                        config=_tcfg,
+                        nbits=_kv_cfg["nbits"],
+                        axis_key=_kv_cfg["axis_key"],
+                        axis_value=_kv_cfg["axis_value"],
+                        residual_length=_kv_cfg["residual_length"],
+                    )
+                else:
+                    from transformers import DynamicCache
+                    c = DynamicCache()
+                with torch.no_grad():
+                    try:
+                        out = _model(_ids, past_key_values=c, use_cache=True, logits_to_keep=1)
+                    except TypeError:
+                        out = _model(_ids, past_key_values=c, use_cache=True)
+                return out.past_key_values
 
-        # Start power sampling (decode-only for accurate energy_mj_per_token)
-        if power_ctx:
-            power_ctx.start()
+            # Start power sampling (decode-only for accurate energy_mj_per_token)
+            if power_ctx:
+                power_ctx.start()
 
-        decode = measure_decode_throughput(
-            model,
-            last_token,
-            n_tokens=args.decode_tokens,
-            past_key_values=filled_cache,
-            warmup_runs=args.warmup_runs,
-            prefill_fn=_re_prefill,
-            measure_runs=args.measure_runs,
-        )
+            decode = measure_decode_throughput(
+                model,
+                last_token,
+                n_tokens=args.decode_tokens,
+                past_key_values=filled_cache,
+                warmup_runs=args.warmup_runs,
+                prefill_fn=_re_prefill,
+                measure_runs=args.decode_measure_runs,
+            )
+        except (torch.cuda.OutOfMemoryError, PrefillOverflowError) as e:
+            if power_ctx:
+                try:
+                    power_ctx.stop()
+                except Exception:
+                    pass
+            reason = f"OOM: {e}" if isinstance(e, torch.cuda.OutOfMemoryError) else f"Prefill-Guard: {e}"
+            print(f"  ⚠ Kontext {ctx_len} übersprungen — {reason}")
+            measurements.append({
+                "context_len": actual_len,
+                "vram_overflow": True,
+                "skipped": True,
+                "skip_reason": reason,
+                "ctx_elapsed_s": round(time.time() - ctx_t0, 1),
+            })
+            try:
+                del prefill, filled_cache
+            except UnboundLocalError:
+                pass
+            del cache
+            gc.collect()
+            if args.device == "cuda":
+                torch.cuda.empty_cache()
+            continue
 
         # VRAM peak + overflow detection
+        # Ehrlicher Peak: Snapshot nach dem 1. Decode-Lauf (Original-Cache,
+        # keine Kopien) — entspricht Deployment (Modell + 1 Cache). Der
+        # globale Peak inkl. Timing-Kopien wird zur Transparenz mitgeloggt.
         vram_peak_mb = 0.0
+        vram_peak_with_copies_mb = 0.0
         vram_reserved_mb = 0.0
         vram_overflow = False
         if args.device == "cuda":
-            vram_peak_mb = torch.cuda.max_memory_allocated() / (1024 * 1024)
+            vram_peak_with_copies_mb = torch.cuda.max_memory_allocated() / (1024 * 1024)
+            vram_peak_mb = decode.get("vram_peak_first_run_mb") or vram_peak_with_copies_mb
             vram_reserved_mb = torch.cuda.max_memory_reserved() / (1024 * 1024)
             if vram_total_mb > 0 and vram_peak_mb > vram_total_mb:
                 vram_overflow = True
                 overflow_mb = vram_peak_mb - vram_total_mb
                 print(f"  ⚠ VRAM OVERFLOW: peak {vram_peak_mb:.0f} MB > physical {vram_total_mb:.0f} MB "
                       f"(+{overflow_mb:.0f} MB spilled to system RAM via PCIe — results may be unreliable)")
+            if decode.get("aborted"):
+                vram_overflow = True
+                print(f"  ⚠ DECODE WATCHDOG: Lauf nach {decode['tokens']} Tokens abgebrochen "
+                      f"({decode['tokens_per_sec']} tok/s) — als Overflow markiert.")
 
         # Power
         power_stats = {"avg_watts": 0.0}
@@ -360,6 +426,7 @@ def run_single_combination(
             "decode_tokens": decode["tokens"],
             "decode_tokens_per_sec": decode["tokens_per_sec"],
             "vram_peak_mb": round(vram_peak_mb, 1),
+            "vram_peak_with_copies_mb": round(vram_peak_with_copies_mb, 1),
             "vram_reserved_mb": round(vram_reserved_mb, 1),
             "kv_cache_mb": round(kv_mb, 2),
             "kv_cache_type": kv_type,
@@ -393,6 +460,7 @@ def run_single_combination(
 
         # Reference PPL (no cache — intrinsic model quality)
         print("\nRunning perplexity benchmark (reference, no cache)...")
+        stage_t0 = time.time()
         ppl_ref = compute_perplexity(
             model, tokenizer,
             dataset=args.ppl_dataset,
@@ -404,7 +472,8 @@ def run_single_combination(
             "tokens": args.ppl_tokens,
             "value": ppl_ref,
         }
-        print(f"  PPL ref ({args.ppl_dataset}): {ppl_ref:.4f}")
+        print(f"  PPL ref ({args.ppl_dataset}): {ppl_ref:.4f}  "
+              f"[stage: {time.time() - stage_t0:.0f}s]")
 
         # Quantized PPL (through the cache — measures quant quality loss)
         if kv_cfg["enabled"]:
@@ -419,7 +488,8 @@ def run_single_combination(
                     residual_length=kv_cfg["residual_length"],
                 )
 
-            print("  Running perplexity benchmark (quantized cache)...")
+            print(f"  Running perplexity benchmark (quantized cache, {kv_quant})...")
+            stage_t0 = time.time()
             ppl_quant = compute_perplexity(
                 model, tokenizer,
                 dataset=args.ppl_dataset,
@@ -433,8 +503,8 @@ def run_single_combination(
                 "value": ppl_quant,
             }
             delta = ppl_quant - ppl_ref
-            print(f"  PPL quant ({args.ppl_dataset}): {ppl_quant:.4f}  (Δ={delta:+.4f})")
-        print(f"  PPL ({args.ppl_dataset}): {ppl_ref:.4f}")
+            print(f"  PPL quant/{kv_quant} ({args.ppl_dataset}): {ppl_quant:.4f}  (Δ={delta:+.4f})  "
+                  f"[stage: {time.time() - stage_t0:.0f}s]")
 
     lm_eval_tasks = [t for t in args.benchmarks if t in ("mmlu", "hellaswag")]
     if lm_eval_tasks:
@@ -453,6 +523,7 @@ def run_single_combination(
     if "needle" in args.benchmarks:
         from benchmarks.needle_haystack import run_needle_test
         print(f"\nRunning Needle-in-a-Haystack (depths={args.needle_depths}, ctx={context_lengths})...")
+        stage_t0 = time.time()
         needle_results = run_needle_test(
             model, tokenizer,
             context_lengths=context_lengths,
@@ -463,6 +534,7 @@ def run_single_combination(
         )
         benchmarks["needle_in_haystack"] = needle_results["summary"]
         benchmarks["needle_in_haystack_trials"] = needle_results["trials"]
+        print(f"  Needle done  [stage: {time.time() - stage_t0:.0f}s]")
 
     # ── Assemble JSON v2 ─────────────────────────────────────────────────
     timestamp = datetime.now()
@@ -495,6 +567,7 @@ def run_single_combination(
         },
         "measurements": measurements,
         "benchmarks": benchmarks,
+        "sdpa_kernel_probe": sdpa_kernel_probe,
         "combo_elapsed_s": combo_elapsed_s,
     }
 
@@ -745,8 +818,11 @@ def main():
     # ── Compact summary table (agent-friendly) ───────────────────────────
     summary_rows = []
     for r in results:
-        # Extract key metrics from the last (longest) context measurement
-        last_m = r["measurements"][-1] if r["measurements"] else {}
+        # Extract key metrics from the last SUCCESSFUL (longest) context
+        # measurement — skipped/OOM contexts are stubs without metrics.
+        ok_ms = [m for m in r["measurements"] if not m.get("skipped")]
+        last_m = ok_ms[-1] if ok_ms else {}
+        n_skipped = len(r["measurements"]) - len(ok_ms)
         ppl_ref = r.get("benchmarks", {}).get("perplexity", {}).get("value")
         ppl_quant = r.get("benchmarks", {}).get("perplexity_quantized", {}).get("value")
         ppl_delta = round(ppl_quant - ppl_ref, 4) if ppl_ref and ppl_quant else None
@@ -763,6 +839,8 @@ def main():
             "kv_mb": last_m.get("kv_cache_mb"),
             "vram_peak_mb": last_m.get("vram_peak_mb"),
             "vram_overflow": any(m.get("vram_overflow", False) for m in r["measurements"]),
+            "contexts_skipped": n_skipped,
+            "sdpa_math_fallback": (r.get("sdpa_kernel_probe") or {}).get("math_fallback"),
             "ppl": ppl_ref,
             "ppl_quant": ppl_quant,
             "ppl_delta": ppl_delta,
@@ -784,10 +862,16 @@ def main():
         delta_str = f"{row['ppl_delta']:+.4f}" if row['ppl_delta'] is not None else "—"
         time_str = f"{row['combo_elapsed_s']:.0f}s"
         overflow_marker = " ⚠️" if row.get("vram_overflow") else ""
+        if row.get("sdpa_math_fallback"):
+            overflow_marker += " MATH!"
+        prefill_str = f"{row['prefill_ms']:.1f}ms" if row.get("prefill_ms") is not None else "n/a"
+        decode_str = f"{row['decode_tok_s']:.1f}t/s" if row.get("decode_tok_s") is not None else "n/a"
+        kv_str = f"{row['kv_mb']:.0f}MB" if row.get("kv_mb") is not None else "n/a"
+        vram_str = f"{row['vram_peak_mb']:.0f}MB" if row.get("vram_peak_mb") is not None else "n/a"
         print(
             f"{row['backend']:<8} {row['kv_quant']:<14} {row['ctx']:>5} "
-            f"{row['prefill_ms']:>8.1f}ms {row['decode_tok_s']:>8.1f}t/s "
-            f"{row['kv_mb']:>7.0f}MB {row['vram_peak_mb']:>7.0f}MB "
+            f"{prefill_str:>9} {decode_str:>10} "
+            f"{kv_str:>8} {vram_str:>8} "
             f"{ppl_str:>8} {delta_str:>8} {time_str:>6}{overflow_marker}"
         )
     print(f"{'='*80}")

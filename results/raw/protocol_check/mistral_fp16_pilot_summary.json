@@ -1,0 +1,25 @@
+{
+  "model": "mistralai/Mistral-7B-v0.1",
+  "timestamp": "2026-07-17T20:51:49",
+  "total_runtime_s": 69.7,
+  "combinations": [
+    {
+      "backend": "sdpa",
+      "kv_quant": "fp16",
+      "axis_key": null,
+      "axis_value": null,
+      "asymmetric": false,
+      "ctx": 32768,
+      "prefill_ms": 10204.4,
+      "decode_tok_s": 9.63,
+      "kv_mb": 4096.0,
+      "vram_peak_mb": 26893.2,
+      "vram_overflow": false,
+      "ppl": null,
+      "ppl_quant": null,
+      "ppl_delta": null,
+      "combo_elapsed_s": 68.3,
+      "json_file": "mistral_7b_v0.1_sdpa_fp16_20260717_205148.json"
+    }
+  ]
+}
