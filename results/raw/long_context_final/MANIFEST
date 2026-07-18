@@ -1,0 +1,39 @@
+{
+  "created": "2026-07-18T10:37:03",
+  "purpose": "Abgabefertiger Hauptmatrix-Datensatz (MA-Thesis). Nur Kopien, Originale unveraendert.",
+  "sources": {
+    "mistral/yi/qwen3/qwen2": "long_context_v2/ (Protokoll v2: logits_to_keep=1, keine Cache-Kopien im Peak; Kernel-Beleg: kernel_probe_validation.json -> flash)",
+    "gemma_4_e4b": "long_context_v2_gemma_repeatkv/ (SDPA-Workaround --sdpa-force-repeat-kv, Efficient-Kernel; fairer Vergleich bis 32k)"
+  },
+  "excluded": {
+    "long_context_v2/gemma_4_e4b_*": "As-is-Lauf (Math-Fallback, 16k/32k uebersprungen) -> nur Fallstudie Kap. 4",
+    "long_context/ (v1)": "Protokoll-Artefakte (Voll-Logits, Cache-Kopien) -> dokumentiert Protokoll-Effekt, nicht fuer Ergebnisse"
+  },
+  "files": [
+    "gemma_4_e4b_sdpa_fp16_20260718_031616.json",
+    "gemma_4_e4b_sdpa_int2_hqq_20260718_033951.json",
+    "gemma_4_e4b_sdpa_int2_hqq_kivi_20260718_034805.json",
+    "gemma_4_e4b_sdpa_int4_hqq_20260718_033138.json",
+    "gemma_4_e4b_sdpa_int8_hqq_20260718_032346.json",
+    "mistral_7b_v0.1_sdpa_fp16_20260717_205952.json",
+    "mistral_7b_v0.1_sdpa_int2_hqq_20260717_212608.json",
+    "mistral_7b_v0.1_sdpa_int2_hqq_kivi_20260717_213526.json",
+    "mistral_7b_v0.1_sdpa_int4_hqq_20260717_211653.json",
+    "mistral_7b_v0.1_sdpa_int8_hqq_20260717_210756.json",
+    "qwen2_7b_sdpa_fp16_20260717_224135.json",
+    "qwen2_7b_sdpa_int2_hqq_20260717_225620.json",
+    "qwen2_7b_sdpa_int2_hqq_kivi_20260717_230130.json",
+    "qwen2_7b_sdpa_int4_hqq_20260717_225105.json",
+    "qwen2_7b_sdpa_int8_hqq_20260717_224605.json",
+    "qwen3_8b_sdpa_fp16_20260717_221319.json",
+    "qwen3_8b_sdpa_int2_hqq_20260717_223211.json",
+    "qwen3_8b_sdpa_int2_hqq_kivi_20260717_223856.json",
+    "qwen3_8b_sdpa_int4_hqq_20260717_222524.json",
+    "qwen3_8b_sdpa_int8_hqq_20260717_221850.json",
+    "yi_1.5_9b_sdpa_fp16_20260717_213918.json",
+    "yi_1.5_9b_sdpa_int2_hqq_20260717_220140.json",
+    "yi_1.5_9b_sdpa_int2_hqq_kivi_20260717_220940.json",
+    "yi_1.5_9b_sdpa_int4_hqq_20260717_215337.json",
+    "yi_1.5_9b_sdpa_int8_hqq_20260717_214556.json"
+  ]
+}

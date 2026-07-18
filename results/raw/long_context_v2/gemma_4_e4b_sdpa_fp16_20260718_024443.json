@@ -1,0 +1,169 @@
+{
+  "schema_version": "2.0",
+  "experiment_id": "gemma_4_e4b_sdpa_fp16_20260718_024443",
+  "timestamp": "2026-07-18T02:44:43",
+  "model": "google/gemma-4-E4B",
+  "model_config": {
+    "num_params_b": 7.94,
+    "num_layers": 42,
+    "num_q_heads": 8,
+    "num_kv_heads": 2,
+    "gqa_ratio": "4:1",
+    "head_dim": 256,
+    "max_position_embeddings": 131072
+  },
+  "attn_backend": "sdpa",
+  "kv_quant": {
+    "enabled": false,
+    "nbits": null,
+    "backend": null,
+    "axis_key": null,
+    "axis_value": null,
+    "asymmetric": false
+  },
+  "environment": {
+    "python_version": "3.12.3",
+    "pytorch_version": "2.8.0+cu128",
+    "transformers_version": "5.5.4",
+    "cuda_version": "12.8",
+    "gpu_name": "NVIDIA GeForce RTX 5090",
+    "gpu_vram_gb": 34.2
+  },
+  "hardware": {
+    "vram_total_mb": 32606.6,
+    "gpu_name": "NVIDIA GeForce RTX 5090"
+  },
+  "config": {
+    "seed": 42,
+    "warmup_runs": 2,
+    "measure_runs": 5,
+    "decode_tokens": 128,
+    "ppl_dataset": "wikitext2",
+    "ppl_tokens": 4096,
+    "sdpa_force_repeat_kv": false
+  },
+  "measurements": [
+    {
+      "context_len": 4096,
+      "prefill_ms": 383.486,
+      "prefill_ms_runs": [
+        383.973,
+        382.119,
+        384.637,
+        383.486,
+        382.89
+      ],
+      "prefill_n_runs": 5,
+      "prefill_tokens_per_sec": 10680.97,
+      "decode_ms": 8160.622,
+      "decode_ms_runs": [
+        8160.622
+      ],
+      "decode_n_runs": 1,
+      "decode_tokens": 128,
+      "decode_tokens_per_sec": 15.69,
+      "vram_peak_mb": 17415.7,
+      "vram_peak_with_copies_mb": 17415.7,
+      "vram_reserved_mb": 17614.0,
+      "kv_cache_mb": 224.0,
+      "kv_cache_type": "DynamicCache (FP16)",
+      "quant_overhead_ms": 0,
+      "dequant_overhead_ms": 0,
+      "overhead_pct": 0.0,
+      "avg_power_watts": 194.7,
+      "energy_mj_per_token": 12414.08,
+      "ctx_elapsed_s": 11.9,
+      "vram_overflow": false
+    },
+    {
+      "context_len": 8192,
+      "prefill_ms": 1107.869,
+      "prefill_ms_runs": [
+        1107.326,
+        1107.869,
+        1107.402,
+        1108.567,
+        1108.458
+      ],
+      "prefill_n_runs": 5,
+      "prefill_tokens_per_sec": 7394.38,
+      "decode_ms": 8043.884,
+      "decode_ms_runs": [
+        8043.884
+      ],
+      "decode_n_runs": 1,
+      "decode_tokens": 128,
+      "decode_tokens_per_sec": 15.91,
+      "vram_peak_mb": 22139.9,
+      "vram_peak_with_copies_mb": 22139.9,
+      "vram_reserved_mb": 22766.0,
+      "kv_cache_mb": 448.0,
+      "kv_cache_type": "DynamicCache (FP16)",
+      "quant_overhead_ms": 0,
+      "dequant_overhead_ms": 0,
+      "overhead_pct": 0.0,
+      "avg_power_watts": 217.1,
+      "energy_mj_per_token": 13643.67,
+      "ctx_elapsed_s": 16.8,
+      "vram_overflow": false
+    },
+    {
+      "context_len": 16384,
+      "vram_overflow": true,
+      "skipped": true,
+      "skip_reason": "Prefill-Guard: VRAM-Peak 38084 MB > physisch 32607 MB (Warmup 225.1s)",
+      "ctx_elapsed_s": 225.2
+    },
+    {
+      "context_len": 32768,
+      "vram_overflow": true,
+      "skipped": true,
+      "skip_reason": "OOM: CUDA out of memory. Tried to allocate 32.00 GiB. GPU 0 has a total capacity of 31.84 GiB of which 0 bytes is free. Including non-PyTorch memory, this process has 17179869184.00 GiB memory in use. Of the allocated memory 56.77 GiB is allocated by PyTorch, and 1.30 GiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)",
+      "ctx_elapsed_s": 37.2
+    }
+  ],
+  "benchmarks": {
+    "perplexity": {
+      "dataset": "wikitext2",
+      "tokens": 4096,
+      "value": 7.6494
+    }
+  },
+  "sdpa_kernel_probe": {
+    "probe_len": 1024,
+    "signatures": [
+      {
+        "q_heads": 8,
+        "head_dim": 256,
+        "kv_heads": 8,
+        "mask": "bool",
+        "is_causal": false,
+        "enable_gqa": false,
+        "calls": 35,
+        "effective_backend": "efficient",
+        "eligible_fast_kernels": [
+          "efficient"
+        ],
+        "cuda_kernels": [
+          "fmha_cutlassF_f16_aligned_32x128_gmem_sm80(PyTorchMemEffAttention::AttentionKernel<cutlass::half_t, cutlass::arch::Sm80, true, 32, 128, 65536, true, true>::Params)"
+        ]
+      },
+      {
+        "q_heads": 8,
+        "head_dim": 512,
+        "kv_heads": 2,
+        "mask": "none",
+        "is_causal": true,
+        "enable_gqa": true,
+        "calls": 7,
+        "effective_backend": "math",
+        "eligible_fast_kernels": [],
+        "cuda_kernels": [
+          "void (anonymous namespace)::softmax_warp_forward<float, float, float, 10, false, false>(float*, float const*, int, int, int, bool const*, int, bool)"
+        ]
+      }
+    ],
+    "math_fallback": true
+  },
+  "combo_elapsed_s": 687.6
+}

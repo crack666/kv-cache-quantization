@@ -28,7 +28,7 @@ import matplotlib.ticker as mticker
 import numpy as np
 
 BASE = Path(__file__).parent.parent
-LONG_CTX = BASE / "results/raw/long_context"
+LONG_CTX = BASE / "results/raw/long_context_final"
 OUT_DIR = BASE / "results/figures/thesis"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 

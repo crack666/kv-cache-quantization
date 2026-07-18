@@ -14,7 +14,7 @@ import csv
 import json
 from pathlib import Path
 
-RESULTS_DIR = Path(__file__).resolve().parent.parent / "results" / "raw" / "long_context"
+RESULTS_DIR = Path(__file__).resolve().parent.parent / "results" / "raw" / "long_context_final"
 
 
 def load_all_results(folder: Path) -> list[dict]:

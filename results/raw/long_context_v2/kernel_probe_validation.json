@@ -1,0 +1,145 @@
+{
+  "timestamp": "2026-07-18T02:30:16",
+  "purpose": "Post-hoc-Kernel-Validierung f\u00fcr long_context_v2 (Eligibility ist ctx-unabh\u00e4ngig, gilt r\u00fcckwirkend)",
+  "dtype": "float16",
+  "attn_backend": "sdpa",
+  "environment": {
+    "torch": "2.8.0+cu128",
+    "gpu": "NVIDIA GeForce RTX 5090"
+  },
+  "models": {
+    "mistral_7b": {
+      "model": "mistralai/Mistral-7B-v0.1",
+      "probe_len": 1024,
+      "signatures": [
+        {
+          "q_heads": 32,
+          "head_dim": 128,
+          "kv_heads": 8,
+          "mask": "none",
+          "is_causal": true,
+          "enable_gqa": true,
+          "calls": 32,
+          "effective_backend": "flash",
+          "eligible_fast_kernels": [
+            "flash",
+            "cudnn"
+          ],
+          "cuda_kernels": [
+            "void pytorch_flash::flash_fwd_kernel<Flash_fwd_kernel_traits<128, 128, 64, 4, false, false, cutlass::half_t, Flash_kernel_traits<128, 128, 64, 4, cutlass::half_t> >, false, true, false, false, true, true, false, false>(pytorch_flash::Flash_fwd_params)"
+          ]
+        }
+      ],
+      "math_fallback": false
+    },
+    "yi_9b": {
+      "model": "01-ai/Yi-1.5-9B",
+      "probe_len": 1024,
+      "signatures": [
+        {
+          "q_heads": 32,
+          "head_dim": 128,
+          "kv_heads": 4,
+          "mask": "none",
+          "is_causal": true,
+          "enable_gqa": true,
+          "calls": 48,
+          "effective_backend": "flash",
+          "eligible_fast_kernels": [
+            "flash",
+            "cudnn"
+          ],
+          "cuda_kernels": [
+            "void pytorch_flash::flash_fwd_kernel<Flash_fwd_kernel_traits<128, 128, 64, 4, false, false, cutlass::half_t, Flash_kernel_traits<128, 128, 64, 4, cutlass::half_t> >, false, true, false, false, true, true, false, false>(pytorch_flash::Flash_fwd_params)"
+          ]
+        }
+      ],
+      "math_fallback": false
+    },
+    "qwen3_8b": {
+      "model": "Qwen/Qwen3-8B",
+      "probe_len": 1024,
+      "signatures": [
+        {
+          "q_heads": 32,
+          "head_dim": 128,
+          "kv_heads": 8,
+          "mask": "none",
+          "is_causal": true,
+          "enable_gqa": true,
+          "calls": 36,
+          "effective_backend": "flash",
+          "eligible_fast_kernels": [
+            "flash",
+            "cudnn"
+          ],
+          "cuda_kernels": [
+            "void pytorch_flash::flash_fwd_kernel<Flash_fwd_kernel_traits<128, 128, 64, 4, false, false, cutlass::half_t, Flash_kernel_traits<128, 128, 64, 4, cutlass::half_t> >, false, true, false, false, true, true, false, false>(pytorch_flash::Flash_fwd_params)"
+          ]
+        }
+      ],
+      "math_fallback": false
+    },
+    "qwen2_7b": {
+      "model": "Qwen/Qwen2-7B",
+      "probe_len": 1024,
+      "signatures": [
+        {
+          "q_heads": 28,
+          "head_dim": 128,
+          "kv_heads": 4,
+          "mask": "none",
+          "is_causal": true,
+          "enable_gqa": true,
+          "calls": 28,
+          "effective_backend": "flash",
+          "eligible_fast_kernels": [
+            "flash",
+            "cudnn"
+          ],
+          "cuda_kernels": [
+            "void pytorch_flash::flash_fwd_kernel<Flash_fwd_kernel_traits<128, 128, 64, 4, false, false, cutlass::half_t, Flash_kernel_traits<128, 128, 64, 4, cutlass::half_t> >, false, true, false, false, true, true, false, false>(pytorch_flash::Flash_fwd_params)"
+          ]
+        }
+      ],
+      "math_fallback": false
+    },
+    "gemma_e4b": {
+      "model": "google/gemma-4-E4B",
+      "probe_len": 1024,
+      "signatures": [
+        {
+          "q_heads": 8,
+          "head_dim": 256,
+          "kv_heads": 8,
+          "mask": "bool",
+          "is_causal": false,
+          "enable_gqa": false,
+          "calls": 35,
+          "effective_backend": "efficient",
+          "eligible_fast_kernels": [
+            "efficient"
+          ],
+          "cuda_kernels": [
+            "fmha_cutlassF_f16_aligned_32x128_gmem_sm80(PyTorchMemEffAttention::AttentionKernel<cutlass::half_t, cutlass::arch::Sm80, true, 32, 128, 65536, true, true>::Params)"
+          ]
+        },
+        {
+          "q_heads": 8,
+          "head_dim": 512,
+          "kv_heads": 2,
+          "mask": "none",
+          "is_causal": true,
+          "enable_gqa": true,
+          "calls": 7,
+          "effective_backend": "math",
+          "eligible_fast_kernels": [],
+          "cuda_kernels": [
+            "void (anonymous namespace)::softmax_warp_forward<float, float, float, 10, false, false>(float*, float const*, int, int, int, bool const*, int, bool)"
+          ]
+        }
+      ],
+      "math_fallback": true
+    }
+  }
+}

@@ -339,7 +339,7 @@ def main():
     )
     parser.add_argument(
         "--input-dir", type=Path,
-        default=Path(__file__).parent.parent / "results" / "raw" / "long_context",
+        default=Path(__file__).parent.parent / "results" / "raw" / "long_context_final",
         help="Directory containing single-run JSON files",
     )
     parser.add_argument(

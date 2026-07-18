@@ -111,6 +111,10 @@ def build_parser() -> argparse.ArgumentParser:
                         "128 Decode-Schritte sind bereits ein stabiles Aggregat.")
     p.add_argument("--prefill-timeout", type=float, default=120.0,
                    help="Prefill-Guard: Kontext abbrechen, wenn der erste Warmup länger dauert (Sekunden; 0 = aus)")
+    p.add_argument("--sdpa-force-repeat-kv", action="store_true",
+                   help="enable_gqa in transformers' SDPA-Pfad deaktivieren (repeat_kv erzwingen). "
+                        "Workaround für den Math-Fallback bei head_dim > 256 + GQA-Flag "
+                        "(Gemma-4-E4B-Befund 2026-07-18: 21 GB/Layer → 840 MB via Efficient-Kernel)")
     p.add_argument("--no-kernel-probe", action="store_true",
                    help="SDPA-Kernel-Verifikation nach Modell-Load überspringen")
     p.add_argument("--full-logits", action="store_true",
@@ -211,6 +215,15 @@ def run_single_combination(
     torch.manual_seed(args.seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(args.seed)
+
+    # Workaround-Flag (2026-07-18): use_gqa_in_sdpa → False zwingt transformers
+    # auf den repeat_kv-Pfad. Der Efficient-Kernel (einziger für head_dim 512)
+    # lehnt enable_gqa ab — ohne das Flag fällt z.B. Gemma-4-E4B still auf Math.
+    # Verifikation: die Kernel-Probe unten zeigt dann gqa=False → efficient.
+    if args.sdpa_force_repeat_kv:
+        import transformers.integrations.sdpa_attention as _sdpa_mod
+        _sdpa_mod.use_gqa_in_sdpa = lambda *a, **k: False
+        print("  SDPA-Workaround aktiv: enable_gqa deaktiviert (repeat_kv erzwungen)")
 
     # VRAM profiler — init BEFORE model loading to capture model VRAM
     profiler = None
@@ -564,6 +577,7 @@ def run_single_combination(
             "decode_tokens": args.decode_tokens,
             "ppl_dataset": args.ppl_dataset,
             "ppl_tokens": args.ppl_tokens,
+            "sdpa_force_repeat_kv": args.sdpa_force_repeat_kv,
         },
         "measurements": measurements,
         "benchmarks": benchmarks,

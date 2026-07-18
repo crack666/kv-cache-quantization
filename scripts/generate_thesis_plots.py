@@ -24,7 +24,7 @@ import numpy as np
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 BASE = Path(__file__).parent.parent
-LONG_CTX = BASE / "results/raw/long_context"
+LONG_CTX = BASE / "results/raw/long_context_final"
 KV_DIST  = BASE / "results/raw/kv_distributions_v2"
 OUT_DIR  = BASE / "results/figures/thesis"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
