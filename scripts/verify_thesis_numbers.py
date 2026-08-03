@@ -23,6 +23,7 @@ from pathlib import Path
 
 BASE = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE / "results/raw/long_context_final"
+KV_DIST = BASE / "results/raw/kv_distributions_v2"
 CH4 = BASE.parent / "thesis/chapters/04_results.tex"
 CH5 = BASE.parent / "thesis/chapters/05_diskussion.tex"
 
@@ -122,6 +123,29 @@ def main():
         for i, q in enumerate(["FP16", "INT8", "INT4", "INT2"]):
             chk(f"prefill {model} {q}", num(cells[i]), data[model][Q[q]]["prefill_ms"], 0)
             chk(f"decode {model} {q}", num(cells[i + 4]), data[model][Q[q]]["decode_tok_s"], 1)
+
+    # tab:kurtosis_summary gegen die Verteilungsdaten
+    kvd = {}
+    for f in sorted(glob.glob(str(KV_DIST / "*.json"))):
+        d = json.load(open(f))
+        kvd[MODEL_SHORT[d["model"].split("/")[-1]]] = d
+    for model, cells in table_rows(tex4, "label{tab:kurtosis_summary}").items():
+        if model not in kvd:
+            continue
+        s = kvd[model]["summary"]
+        layers = kvd[model]["layers"]
+        chk(f"kurtosis-mean {model}", num(cells[0]), s["key_kurtosis_mean"], 2)
+        chk(f"kurtosis-max {model}", num(cells[1]), s["key_kurtosis_max"],
+            1 if s["key_kurtosis_max"] > 10 else 2)
+        # Anzeigegenauigkeit aus der Tabellenzelle ableiten (0.15 -> 2, 0.001 -> 3)
+        m_dec = re.search(r"\.(\d+)", cells[2])
+        chk(f"OR6sigma {model}", num(cells[2]), s["key_outlier_6sigma_mean"] * 100,
+            len(m_dec.group(1)) if m_dec else 2)
+        # "31/32" -> Heavy-Tail-Layer (Key-Kurtosis > 3) / Gesamtzahl
+        heavy_tex, total_tex = (re.sub(r"[^\d/]", "", cells[3]).split("/") + ["nan"])[:2]
+        heavy_json = sum(1 for l in layers if l["key"]["kurtosis"] > 3)
+        chk(f"heavy-tail-layer {model}", float(heavy_tex), heavy_json, 0)
+        chk(f"layer-gesamt {model}", float(total_tex), len(layers), 0)
 
     for model, cells in table_rows(tex4, "label{tab:kivi}").items():
         if model not in data:

@@ -677,7 +677,7 @@ def plot_kv_key_distributions(kv_dists_raw):
     """Abbildung 7 — Key-Aktivierungsverteilungen: Linear (links) + Log-Skala (rechts).
 
     Zwei Panels zeigen die gemessenen Key-Histogramme vs. N(0,1)-Referenz.
-    Log-Skala macht Schwanz-Unterschiede sichtbar: Gausssche Parabel vs. Heavy Tails.
+    Log-Skala macht die Verteilungsraender sichtbar: Gausssche Parabel vs. Heavy Tails.
     """
     from scipy.stats import norm as scipy_norm
 
@@ -744,7 +744,7 @@ def plot_kv_key_distributions(kv_dists_raw):
             ax.set_yscale("log")
             ax.set_ylim(5e-4, 2.0)
             ax.set_ylabel("Dichte (log)", fontsize=9.5)
-            ax.set_title("Log-Skala — Schwanz-Verhalten", fontsize=10)
+            ax.set_title("Log-Skala — Verteilungsränder", fontsize=10)
             # Annotate where heavy tails diverge from Gaussian
             ax.annotate(
                 "Heavy Tails:\nModelle > N(0,1)",
