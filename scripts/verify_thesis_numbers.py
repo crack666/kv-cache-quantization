@@ -109,10 +109,12 @@ def main():
             continue
         ref = data[model]["fp16"]["ppl"]
         for i, q in enumerate(["INT8", "INT4", "INT2", "KIVI"]):
-            d_json = abs(data[model][Q[q]]["ppl_quant"] - ref)
+            # Vorzeichenbehaftet: negative Werte = Verbesserung gegenueber FP16
+            d_json = data[model][Q[q]]["ppl_quant"] - ref
             if not math.isnan(num(cells[i])):
+                mag = abs(d_json)
                 chk(f"Δppl {model} {q}", num(cells[i]), d_json,
-                    0 if d_json > 100 else (1 if d_json > 10 else 3))
+                    0 if mag > 100 else (1 if mag > 10 else 3))
 
     for model, cells in table_rows(tex4, "label{tab:throughput}").items():
         if model not in data:
@@ -126,9 +128,10 @@ def main():
             continue
         ref = data[model]["fp16"]["ppl"]
         for i, q in enumerate(["INT2", "KIVI"]):
-            d_json = abs(data[model][Q[q]]["ppl_quant"] - ref)
+            d_json = data[model][Q[q]]["ppl_quant"] - ref
+            mag = abs(d_json)
             chk(f"kivi {model} {q}", num(cells[i]), d_json,
-                0 if d_json > 100 else (1 if d_json > 10 else 3))
+                0 if mag > 100 else (1 if mag > 10 else 3))
 
     m = data["Mistral-7B"]
     for q, cells in table_rows(tex5, "label{tab:overhead}").items():
