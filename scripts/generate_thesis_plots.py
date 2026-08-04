@@ -564,15 +564,16 @@ def plot_layer_kurtosis(kv_dists_raw):
         ax.set_yticklabels([f"{model}\n(n={n})"], fontsize=9)
         ax.tick_params(axis="y", length=0)
 
-        # x-axis: show ticks every 4 layers; only label bottom subplot
+        # x-axis: Ticks alle 4 Layer. Jedes Panel ist auf seine eigene
+        # Layer-Zahl skaliert, deshalb muss jede Zeile ihre eigene
+        # Beschriftung tragen -- eine gemeinsame Achse waere fuer alle
+        # Modelle ausser dem tiefsten falsch.
         tick_step = 4
         tick_pos  = list(range(0, n, tick_step))
         ax.set_xticks(tick_pos)
+        ax.set_xticklabels([str(t) for t in tick_pos], fontsize=8)
         if ax is axes[-1]:
-            ax.set_xticklabels([str(t) for t in tick_pos], fontsize=8)
             ax.set_xlabel("Layer-Index (absolut)", fontsize=10)
-        else:
-            ax.set_xticklabels([])
 
         ax.set_xlim(-0.5, n - 0.5)
 
