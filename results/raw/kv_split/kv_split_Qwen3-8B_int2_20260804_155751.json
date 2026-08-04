@@ -1,0 +1,30 @@
+{
+  "model": "Qwen/Qwen3-8B",
+  "nbits": 2,
+  "axis": 1,
+  "q_group_size": 64,
+  "residual_length": 128,
+  "ppl_tokens": 4096,
+  "results": {
+    "fp16": {
+      "ppl": 8.3489,
+      "delta": 0.0
+    },
+    "both_stock": {
+      "ppl": 52.0538,
+      "delta": 43.7049
+    },
+    "both_split": {
+      "ppl": 52.0538,
+      "delta": 43.7049
+    },
+    "keys_only": {
+      "ppl": 43.4738,
+      "delta": 35.1249
+    },
+    "values_only": {
+      "ppl": 8.3602,
+      "delta": 0.01130000000000031
+    }
+  }
+}
