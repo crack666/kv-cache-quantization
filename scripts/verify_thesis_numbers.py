@@ -108,7 +108,27 @@ def expect_columns(texstr, label, expected, name):
     return True
 
 
+def check_raw_dirs_documented():
+    """Meldet Rohdatenverzeichnisse, die results/raw/README.md nicht einordnet.
+
+    Die Verzeichnisnamen geben die Reihenfolge der Messlaeufe nicht wieder
+    ("v2" gegenueber "final"). Ohne diese Pruefung kann ein neuer Lauf
+    unbemerkt neben dem Hauptdatensatz liegen.
+    """
+    raw = BASE / "results/raw"
+    readme = raw / "README.md"
+    if not readme.exists():
+        fails.append("  README fehlt: %s" % readme)
+        return
+    text = readme.read_text(encoding="utf-8")
+    for d in sorted(p.name for p in raw.iterdir() if p.is_dir()):
+        if ("`%s/`" % d) not in text:
+            fails.append("  Rohdatenverzeichnis nicht in results/raw/README.md "
+                         "eingeordnet: %s" % d)
+
+
 def main():
+    check_raw_dirs_documented()
     data = {}
     for f in sorted(glob.glob(str(DATA_DIR / "*_summary.json"))):
         d = json.load(open(f))
