@@ -71,6 +71,43 @@ def num(s):
                         s.replace("{,}", ".").replace(",", ".").replace("$", "")) or "nan")
 
 
+def header_cells(texstr, label):
+    """Beschriftungen der Kopfzeile einer Tabelle, ohne die fuehrende Modellspalte.
+
+    Die Kopfzeile ist die letzte Zeile vor \\midrule, die & und \\\\ enthaelt.
+    LaTeX-Makros werden entfernt, sodass etwa \\textbf{OR}$_{3\\sigma}$ als
+    "OR3sigma" zurueckkommt.
+    """
+    i = texstr.index(label)
+    body = texstr[i:texstr.index("\\midrule", i)]
+    head = [l for l in body.split("\n") if "&" in l and "\\\\" in l]
+    if not head:
+        return []
+    cells = head[-1].split("&")[1:]
+    out = []
+    for c in cells:
+        c = re.sub(r"\\[a-zA-Z]+", "", c)
+        out.append(re.sub(r"[^A-Za-z0-9]", "", c))
+    return out
+
+
+def expect_columns(texstr, label, expected, name):
+    """Meldet einen Befund, wenn sich die Spaltenstruktur einer Tabelle geaendert hat.
+
+    Ohne diese Pruefung liest der Parser bei einer eingefuegten Spalte still die
+    falsche Zelle -- er kann dadurch ebenso falsch bestehen wie falsch scheitern.
+    """
+    actual = header_cells(texstr, label)
+    if actual != expected:
+        fails.append("  STRUKTUR %s: Spalten geaendert\n"
+                     "      erwartet: %s\n"
+                     "      gefunden: %s\n"
+                     "      -> Spaltenindizes in diesem Skript nachziehen"
+                     % (name, expected, actual))
+        return False
+    return True
+
+
 def main():
     data = {}
     for f in sorted(glob.glob(str(DATA_DIR / "*_summary.json"))):
@@ -82,6 +119,7 @@ def main():
 
     tex4, tex5 = open(CH4).read(), open(CH5).read()
 
+    expect_columns(tex4, "label{tab:kv_vram}", ['Ctx', 'FP16', 'INT8', 'INT4', 'INT2', 'INT2Ratio'], "tab:kv_vram")
     for model, cells in table_rows(tex4, "label{tab:kv_vram}").items():
         if model not in data:
             continue
@@ -89,6 +127,7 @@ def main():
         for i, q in enumerate(["FP16", "INT8", "INT4", "INT2"]):
             chk(f"kv_vram {model} {q}", num(cells[i + 1]), data[model][Q[q]]["kv_mb"], 0)
 
+    expect_columns(tex4, "label{tab:vram_savings}", ['FP16', 'INT8', 'INT4', 'INT2', 'INT2', 'PeakCache'], "tab:vram_savings")
     for model, cells in table_rows(tex4, "label{tab:vram_savings}").items():
         if model not in data:
             continue
@@ -97,6 +136,7 @@ def main():
         dpct = (data[model][Q["INT2"]]["vram_peak_mb"] / data[model][Q["FP16"]]["vram_peak_mb"] - 1) * 100
         chk(f"vram {model} ΔINT2%", num(cells[4]), dpct, 1)
 
+    expect_columns(tex4, "label{tab:ppl_main}", ['FP16', 'INT8', 'INT4', 'INT2', 'KIVI', ''], "tab:ppl_main")
     for model, cells in table_rows(tex4, "label{tab:ppl_main}").items():
         if model not in data:
             continue
@@ -105,6 +145,7 @@ def main():
             v = data[model][Q[q]]["ppl_quant"]
             chk(f"ppl {model} {q}", num(cells[i + 1]), v, 0 if v > 100 else (2 if v > 10 else 3))
 
+    expect_columns(tex4, "label{tab:ppl_delta}", ['INT8', 'INT4', 'INT2', 'KIVI', 'INT2', 'KIVI'], "tab:ppl_delta")
     for model, cells in table_rows(tex4, "label{tab:ppl_delta}").items():
         if model not in data:
             continue
@@ -117,36 +158,57 @@ def main():
                 chk(f"Δppl {model} {q}", num(cells[i]), d_json,
                     0 if mag > 100 else (1 if mag > 10 else 3))
 
-    for model, cells in table_rows(tex4, "label{tab:throughput}").items():
-        if model not in data:
-            continue
-        for i, q in enumerate(["FP16", "INT8", "INT4", "INT2"]):
-            chk(f"prefill {model} {q}", num(cells[i]), data[model][Q[q]]["prefill_ms"], 0)
-            chk(f"decode {model} {q}", num(cells[i + 4]), data[model][Q[q]]["decode_tok_s"], 1)
+    QT = ["FP16", "INT8", "INT4", "INT2", "KIVI"]
+    if expect_columns(tex4, "label{tab:throughput}", QT + QT, "tab:throughput"):
+        for model, cells in table_rows(tex4, "label{tab:throughput}").items():
+            if model not in data:
+                continue
+            for i, q in enumerate(QT):
+                chk(f"prefill {model} {q}", num(cells[i]),
+                    data[model][Q[q]]["prefill_ms"], 0)
+                chk(f"decode {model} {q}", num(cells[i + len(QT)]),
+                    data[model][Q[q]]["decode_tok_s"], 1)
 
     # tab:kurtosis_summary gegen die Verteilungsdaten
     kvd = {}
     for f in sorted(glob.glob(str(KV_DIST / "*.json"))):
         d = json.load(open(f))
         kvd[MODEL_SHORT[d["model"].split("/")[-1]]] = d
-    for model, cells in table_rows(tex4, "label{tab:kurtosis_summary}").items():
+    # Spalten: kappa-mean, kappa-max, OR3sigma, OR6sigma, DR-mean, DR-max, VR, HT-Layer
+    KS_COLS = ["Key", "", "OR3", "OR6", "DR", "DR", "VR", "HTL"]
+    if expect_columns(tex4, "label{tab:kurtosis_summary}", KS_COLS, "tab:kurtosis_summary"):
+      for model, cells in table_rows(tex4, "label{tab:kurtosis_summary}").items():
         if model not in kvd:
             continue
         s = kvd[model]["summary"]
         layers = kvd[model]["layers"]
+        keys = [l["key"] for l in layers]
+
+        def dec(cell, default=2):
+            """Angezeigte Nachkommastellen der Zelle (0.15 -> 2, 0.001 -> 3)."""
+            m = re.search(r"\.(\d+)", cell)
+            return len(m.group(1)) if m else default
+
         chk(f"kurtosis-mean {model}", num(cells[0]), s["key_kurtosis_mean"], 2)
         chk(f"kurtosis-max {model}", num(cells[1]), s["key_kurtosis_max"],
             1 if s["key_kurtosis_max"] > 10 else 2)
-        # Anzeigegenauigkeit aus der Tabellenzelle ableiten (0.15 -> 2, 0.001 -> 3)
-        m_dec = re.search(r"\.(\d+)", cells[2])
-        chk(f"OR6sigma {model}", num(cells[2]), s["key_outlier_6sigma_mean"] * 100,
-            len(m_dec.group(1)) if m_dec else 2)
+        chk(f"OR3sigma {model}", num(cells[2]),
+            sum(k["outlier_ratio_3sigma"] for k in keys) / len(keys) * 100, dec(cells[2]))
+        chk(f"OR6sigma {model}", num(cells[3]), s["key_outlier_6sigma_mean"] * 100,
+            dec(cells[3]))
+        chk(f"DR-mean {model}", num(cells[4]),
+            sum(k["dynamic_range"] for k in keys) / len(keys), dec(cells[4], 1))
+        chk(f"DR-max {model}", num(cells[5]),
+            max(k["dynamic_range"] for k in keys), dec(cells[5], 1))
+        chk(f"VR {model}", num(cells[6]),
+            sum(k["variance_ratio"] for k in keys) / len(keys), dec(cells[6]))
         # "31/32" -> Heavy-Tail-Layer (Key-Kurtosis > 3) / Gesamtzahl
-        heavy_tex, total_tex = (re.sub(r"[^\d/]", "", cells[3]).split("/") + ["nan"])[:2]
+        heavy_tex, total_tex = (re.sub(r"[^\d/]", "", cells[7]).split("/") + ["nan"])[:2]
         heavy_json = sum(1 for l in layers if l["key"]["kurtosis"] > 3)
         chk(f"heavy-tail-layer {model}", float(heavy_tex), heavy_json, 0)
         chk(f"layer-gesamt {model}", float(total_tex), len(layers), 0)
 
+    expect_columns(tex4, "label{tab:kivi}", ['HQQ', 'KIVI', 'Faktor', 'Bewertung'], "tab:kivi")
     for model, cells in table_rows(tex4, "label{tab:kivi}").items():
         if model not in data:
             continue
@@ -158,6 +220,7 @@ def main():
                 0 if mag > 100 else (1 if mag > 10 else 3))
 
     m = data["Mistral-7B"]
+    expect_columns(tex5, "label{tab:overhead}", ['Prefillms', 'Decodetoks', 'VRAMPeakGB'], "tab:overhead")
     for q, cells in table_rows(tex5, "label{tab:overhead}").items():
         qq = {"FP16 (Baseline)": "fp16", "INT8 (HQQ)": "int8-hqq", "INT4 (HQQ)": "int4-hqq",
               "INT2 (HQQ)": "int2-hqq", "INT2 (KIVI)": "int2-hqq(kivi)"}.get(q.strip())
