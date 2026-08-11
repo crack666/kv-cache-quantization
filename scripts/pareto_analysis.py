@@ -170,11 +170,11 @@ def plot(points):
         ax.set_title(f"{model} (ctx = {ctx_note})", fontsize=10.5,
                      color=MODEL_COLORS[model])
 
-    # Jedes Panel bekommt eigene X-Tick-Labels. Ohne das erbt die obere Reihe
-    # ihre Beschriftung von der unteren, wo sie zwei Panels entfernt steht und
-    # vom Titel der darunterliegenden Grafik verdeckt wirkt.
-    for ax in axes[:3]:
-        ax.tick_params(labelbottom=True)
+    # Jedes Panel bekommt eigene Tick-Labels auf beiden Achsen. Mit sharex/sharey
+    # beschriftet Matplotlib sonst nur die unterste Zeile und die linke Spalte,
+    # sodass vier der fuenf Panels ohne ablesbare Achse dastehen.
+    for ax in axes[:5]:
+        ax.tick_params(labelbottom=True, labelleft=True)
 
     # 6. Panel: Legende + Lesehilfe
     lax = axes[5]
@@ -199,8 +199,9 @@ def plot(points):
     fig.supylabel("$|\\Delta$-PPL$|$ gegenüber FP16 (log)", fontsize=11)
     fig.suptitle("Pareto-Analyse: Qualitätsverlust vs. KV-Cache-Größe", fontsize=12.5)
 
-    # h_pad hält die X-Beschriftung der oberen Reihe von den Titeln darunter frei
-    fig.tight_layout(h_pad=2.4)
+    # h_pad hält die X-Beschriftung der oberen Reihe von den Titeln darunter frei,
+    # w_pad schafft Platz fuer die nun in jeder Spalte gesetzten Y-Labels
+    fig.tight_layout(h_pad=2.4, w_pad=1.8)
     for ext, kw in [("pdf", {}), ("png", {"dpi": 150})]:
         out = OUT_DIR / f"pareto_front.{ext}"
         fig.savefig(out, bbox_inches="tight", **kw)
