@@ -18,6 +18,7 @@ und in mindestens einem strikt besser.
 
 import glob
 import json
+import sys
 from pathlib import Path
 
 import matplotlib
@@ -169,8 +170,11 @@ def plot(points):
         ax.set_title(f"{model} (ctx = {ctx_note})", fontsize=10.5,
                      color=MODEL_COLORS[model])
 
-    # Spalte 3 hat unten das Legenden-Panel (axis off) -> X-Tick-Labels oben aktivieren
-    axes[2].tick_params(labelbottom=True)
+    # Jedes Panel bekommt eigene X-Tick-Labels. Ohne das erbt die obere Reihe
+    # ihre Beschriftung von der unteren, wo sie zwei Panels entfernt steht und
+    # vom Titel der darunterliegenden Grafik verdeckt wirkt.
+    for ax in axes[:3]:
+        ax.tick_params(labelbottom=True)
 
     # 6. Panel: Legende + Lesehilfe
     lax = axes[5]
@@ -195,7 +199,8 @@ def plot(points):
     fig.supylabel("$|\\Delta$-PPL$|$ gegenüber FP16 (log)", fontsize=11)
     fig.suptitle("Pareto-Analyse: Qualitätsverlust vs. KV-Cache-Größe", fontsize=12.5)
 
-    fig.tight_layout()
+    # h_pad hält die X-Beschriftung der oberen Reihe von den Titeln darunter frei
+    fig.tight_layout(h_pad=2.4)
     for ext, kw in [("pdf", {}), ("png", {"dpi": 150})]:
         out = OUT_DIR / f"pareto_front.{ext}"
         fig.savefig(out, bbox_inches="tight", **kw)
@@ -244,6 +249,13 @@ def front_report(points):
 
 
 if __name__ == "__main__":
+    # Windows-Konsole gibt sonst cp1252 aus und scheitert am Delta der Reports
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
+
     pts = load_points()
     for m, p in pts.items():
         print(f"{m}: {len(p)} Konfigurationen @ctx={p[0]['ctx']}")
