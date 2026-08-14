@@ -8,6 +8,10 @@ Betroffen sind zwei Verfahren:
    ueber INT4 und INT2 (n = 10).
 2. Mann-Whitney-U-Test zwischen den Sliding-Window- und den globalen Layern von
    Gemma-4-E4B (Abschnitt "Warum Gemma-4-E4B aus dem Muster faellt").
+3. Spearman-Rangkorrelation der Layer-Kurtosis zwischen den beiden
+   Kalibrationsstichproben (Abschnitt "Stabilitaet gegenueber der
+   Kalibrationsstichprobe"): Bleibt die Rangfolge der Layer erhalten, wenn die
+   Kennzahl an einem anderen Textausschnitt erhoben wird?
 
 Zum p-Wert der Rangkorrelation: ``scipy.stats.spearmanr`` bestimmt ihn ueber
 eine t-Approximation, die eine hinreichend grosse Stichprobe voraussetzt. Bei
@@ -16,9 +20,10 @@ exakten Permutationstest, der alle 5! = 120 Rangzuordnungen aufzaehlt. Bei
 n = 5 betraegt der kleinstmoegliche zweiseitige p-Wert 2/120 = 0.0167; kein
 Ergebnis dieser Stichprobengroesse kann darunter liegen.
 
-Datenquellen (beide im Repositorium):
+Datenquellen (alle im Repositorium):
   results/raw/kv_distributions_v2/kv_dist_*.json   Key-Kurtosis je Layer/Modell
   results/tables/phase_b_long_context.csv          Delta-PPL je Modell/Konfiguration
+  results/raw/rotation/rotation_*.json             zweite Kalibrationsstichprobe
 
 Usage:
     python scripts/statistical_tests.py
@@ -34,6 +39,15 @@ from scipy import stats
 BASE = Path(__file__).parent.parent
 DIST_DIR = BASE / "results" / "raw" / "kv_distributions_v2"
 PHASE_B = BASE / "results" / "tables" / "phase_b_long_context.csv"
+ROT_DIR = BASE / "results" / "raw" / "rotation"
+
+# Zweite Kalibrationsstichprobe. Von den drei Qwen2-Laeufen desselben Tages ist
+# nur der letzte auswertbar; die beiden frueheren scheiterten an der
+# Kontrollbedingung (siehe Fussnote im Ergebniskapitel).
+ROTATION_RUNS = {
+    "Qwen3-8B": "rotation_Qwen3-8B_int2_20260804_114123.json",
+    "Qwen2-7B": "rotation_Qwen2-7B_int4_20260804_112454.json",
+}
 
 # Die Quellen benennen die Modelle unterschiedlich: Die Verteilungsmessungen
 # fuehren den HuggingFace-Bezeichner, die Profiling-Tabelle einen Kurznamen.
@@ -108,6 +122,30 @@ def exact_spearman_p(x, y):
     return result.pvalue, result.null_distribution.size
 
 
+def layer_kurtosis(model):
+    """Key-Kurtosis je Layer aus der Hauptstichprobe (4096 Tokens)."""
+    ident = next(k for k, v in MODELS.items() if v == model and "/" in k)
+    for path in DIST_DIR.glob("kv_dist_*.json"):
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if data["model"] == ident:
+            return {l["layer"]: l["key"]["kurtosis"] for l in data["layers"]}
+    raise FileNotFoundError(f"keine Verteilungsmessung fuer {model}")
+
+
+def rotation_layer_kurtosis(model):
+    """Key-Kurtosis je Layer aus der zweiten Stichprobe (Rotationsexperiment)."""
+    data = json.loads((ROT_DIR / ROTATION_RUNS[model]).read_text(encoding="utf-8"))
+    # Die Laeufe stammen aus zwei Schema-Staenden des Skripts: der aeltere nennt
+    # die Felder "before"/"after", der neuere "kurt_before"/"kurt_after".
+    per_layer = {}
+    for entry in data["kurtosis_per_layer"]:
+        value = entry.get("kurt_before", entry.get("before"))
+        if value is None:
+            raise KeyError(f"kein Kurtosis-Feld in {ROTATION_RUNS[model]}")
+        per_layer[entry["layer"]] = value
+    return per_layer, data["kurtosis_before_mean"]
+
+
 def gemma_layer_groups():
     """Key-Kurtosis der Gemma-Layer, getrennt nach Attention-Typ."""
     path = next(DIST_DIR.glob("kv_dist_gemma*.json"))
@@ -170,6 +208,29 @@ def main():
     print()
     print("  Die Richtung ist der Erwartung entgegengesetzt: Die globalen Layer")
     print("  haben die niedrigere Kurtosis, nicht die gefensterten.")
+
+    print()
+    print("=" * 78)
+    print("Stabilitaet gegenueber der Kalibrationsstichprobe")
+    print("=" * 78)
+    print(f"{'Modell':<12}{'kappa 4096':>12}{'kappa 2048':>12}{'Abw.':>8}"
+          f"{'rho (Layer)':>13}{'Layer':>7}{'argmax gleich':>15}")
+    for model in ("Qwen3-8B", "Qwen2-7B"):
+        main_layers = layer_kurtosis(model)
+        rot_layers, rot_mean = rotation_layer_kurtosis(model)
+        shared = sorted(set(main_layers) & set(rot_layers))
+        a = [main_layers[i] for i in shared]
+        b = [rot_layers[i] for i in shared]
+        rho = stats.spearmanr(a, b).statistic
+        main_mean = kurt[model]
+        dev = (rot_mean - main_mean) / main_mean * 100
+        same = (max(shared, key=lambda i: main_layers[i])
+                == max(shared, key=lambda i: rot_layers[i]))
+        print(f"{model:<12}{main_mean:>12.2f}{rot_mean:>12.2f}{dev:>+7.1f}%"
+              f"{rho:>13.2f}{len(shared):>7}{'ja' if same else 'nein':>15}")
+    print()
+    print("  Die absoluten Werte haengen leicht von der Stichprobe ab, die")
+    print("  Rangfolge der Layer dagegen kaum. Das traegt die Layer-Auswahl.")
 
     import scipy
     print()
