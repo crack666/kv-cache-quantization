@@ -8,7 +8,11 @@ Betroffen sind zwei Verfahren:
    ueber INT4 und INT2 (n = 10).
 2. Mann-Whitney-U-Test zwischen den Sliding-Window- und den globalen Layern von
    Gemma-4-E4B (Abschnitt "Warum Gemma-4-E4B aus dem Muster faellt").
-3. Spearman-Rangkorrelation der Layer-Kurtosis zwischen den beiden
+3. Exakter Vorzeichentest ueber die Needle-Versuche (Abschnitt
+   "Perplexitaet als Qualitaetsmass"): Faellt das Retrieval unter
+   Quantisierung haeufiger aus als unter FP16, als sich mit Zufall
+   erklaeren laesst?
+4. Spearman-Rangkorrelation der Layer-Kurtosis zwischen den beiden
    Kalibrationsstichproben (Abschnitt "Stabilitaet gegenueber der
    Kalibrationsstichprobe"): Bleibt die Rangfolge der Layer erhalten, wenn die
    Kennzahl an einem anderen Textausschnitt erhoben wird?
@@ -24,6 +28,7 @@ Datenquellen (alle im Repositorium):
   results/raw/kv_distributions_v2/kv_dist_*.json   Key-Kurtosis je Layer/Modell
   results/tables/phase_b_long_context.csv          Delta-PPL je Modell/Konfiguration
   results/raw/rotation/rotation_*.json             zweite Kalibrationsstichprobe
+  results/tables/phase_b_long_context.csv          Needle-Trefferquote je Konfig.
 
 Usage:
     python scripts/statistical_tests.py
@@ -65,6 +70,9 @@ MODELS = {
     "Qwen3-8B": "Qwen3-8B",
 }
 
+# Needle-in-a-Haystack: vier Kontextlaengen mal fuenf Positionen je Konfiguration.
+NEEDLE_TRIALS = 20
+
 # Gemma-4-E4B: Layer mit eigenstaendigen KV-Tensoren. Die globalen Layer sind
 # im Cache an der doppelten Key-Dimension erkennbar (512 statt 256).
 GLOBAL_HEAD_DIM = 512
@@ -101,6 +109,41 @@ def load_delta_ppl():
                 assert abs(out[key] - value) < 1e-9, f"uneinheitliche Delta-PPL fuer {key}"
             out[key] = value
     return out
+
+
+def load_needle():
+    """Anzahl erfolgreicher Needle-Abrufe je Modell und Konfiguration.
+
+    Die Tabelle fuehrt die ueber alle 20 Versuche aggregierte Trefferquote je
+    Kontextlaenge erneut auf. Wir nehmen den ersten Eintrag und pruefen, dass
+    die uebrigen damit uebereinstimmen.
+    """
+    out = {}
+    with PHASE_B.open(encoding="utf-8") as fh:
+        for row in csv.DictReader(fh):
+            if not row.get("needle_score"):
+                continue
+            model = MODELS.get(row["model"], row["model"])
+            key = (model, row["kv_quant"])
+            hits = float(row["needle_score"]) * NEEDLE_TRIALS
+            assert abs(hits - round(hits)) < 1e-9, f"keine ganze Trefferzahl fuer {key}"
+            hits = int(round(hits))
+            if key in out:
+                assert out[key] == hits, f"uneinheitliche Needle-Quote fuer {key}"
+            out[key] = hits
+    return out
+
+
+def sign_test_p(k):
+    """Zweiseitiger exakter Vorzeichentest bei k einseitigen Diskordanzen.
+
+    Alle k diskordanten Versuche zeigen in dieselbe Richtung; unter der
+    Nullhypothese ist jede Richtung gleich wahrscheinlich. Der zweiseitige
+    p-Wert ist damit 2 * 2^-k, fuer k = 0 nicht definiert.
+    """
+    if k == 0:
+        return None
+    return min(1.0, 2.0 * 2.0 ** -k)
 
 
 def exact_spearman_p(x, y):
@@ -208,6 +251,30 @@ def main():
     print()
     print("  Die Richtung ist der Erwartung entgegengesetzt: Die globalen Layer")
     print("  haben die niedrigere Kurtosis, nicht die gefensterten.")
+
+    print()
+    print("=" * 78)
+    print("Exakter Vorzeichentest: Needle-Abrufe FP16 gegen Quantisierung")
+    print("=" * 78)
+    needle = load_needle()
+    print(f"{'Modell':<14}{'Konfig.':<12}{'FP16':>6}{'quant.':>8}{'k':>4}{'p':>10}")
+    for m in models:
+        base = needle.get((m, "FP16"))
+        if base is None:
+            continue
+        for cfg in ("INT8", "INT4", "INT2", "INT2-KIVI"):
+            hits = needle.get((m, cfg))
+            if hits is None or hits == base:
+                continue
+            k = abs(base - hits)
+            p = sign_test_p(k)
+            print(f"{m:<14}{cfg:<12}{base:>6}{hits:>8}{k:>4}{p:>10.3f}")
+    print()
+    print("  k ist die Zahl der diskordanten Versuche. Sie folgt aus der Differenz\n"
+          "  der Trefferzahlen, weil kein Versuch unter Quantisierung gelingt, den\n"
+          "  FP16 verfehlt (Abschnitt 'Needle-in-a-Haystack'). Der Test setzt die\n"
+          "  20 Versuche als unabhaengig an; da die Ausfaelle nach Kontextlaenge\n"
+          "  klumpen, ist der p-Wert als Groessenordnung zu lesen.")
 
     print()
     print("=" * 78)
