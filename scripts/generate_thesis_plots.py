@@ -358,7 +358,9 @@ def plot_delta_ppl_heatmap(summaries):
     quants = ["int8-hqq", "int4-hqq", "int2-hqq", "int2-hqq(kivi)"]
     models = sorted(summaries.keys())
 
-    # Build matrix; cap at 100 for display
+    # Build matrix with the raw |delta| values. The color scale is capped at
+    # 100 further down (via np.clip), but the cell annotations must show the
+    # true numbers -- otherwise the figure contradicts the delta-PPL table.
     matrix = np.full((len(models), len(quants)), np.nan)
     for i, model in enumerate(models):
         combos = summaries[model]
@@ -371,7 +373,7 @@ def plot_delta_ppl_heatmap(summaries):
                 None
             )
             if row and row.get("ppl_delta") is not None:
-                matrix[i, j] = min(abs(row["ppl_delta"]), 100.0)
+                matrix[i, j] = abs(row["ppl_delta"])
 
     fig, ax = plt.subplots(figsize=(8, 4.5))
 
@@ -402,8 +404,12 @@ def plot_delta_ppl_heatmap(summaries):
             elif val < 10.0:
                 txt = f"{val:.2f}"
                 color = "white"
-            else:
+            elif val < vmax:
                 txt = f"{val:.1f}"
+                color = "white"
+            else:
+                # Above the color-scale cap: annotate the uncapped value.
+                txt = f"{val:.0f}"
                 color = "white"
             ax.text(j, i, txt, ha="center", va="center",
                     fontsize=9, color=color, fontweight="bold")
