@@ -76,6 +76,37 @@ Deshalb ist die Gewichtsachse interessant: `unsloth/Qwen3.8-27B-GGUF` führt
 Bitbreite — rund **1,2 GB weniger bei imatrix-Kalibrierung**. Ob das die
 Qualität hält, ist offen und Teil des Durchlaufs.
 
+## 6. Baseline-Durchsatz (Produktivkonfiguration)
+
+Library-`q4_K_M` + `q8_0`-KV, Ollama 0.33.0. Puffergroessen aus dem
+llama.cpp-Log, nicht aus `nvidia-smi`.
+
+| Kontext | Prefill | Decode | KV-Puffer | Needle |
+|---:|---:|---:|---:|---:|
+| 8192 | 2998 tok/s | 112 tok/s | 272 MiB | 3/3 |
+| 131072 | 1538 tok/s | 57 tok/s | 4352 MiB | 3/3 |
+
+Der KV-Puffer entspricht in beiden Faellen exakt 34,0 KiB/Token. Decode halbiert
+sich zwischen 8k und 128k -- fuer die Bewertung des Arbeitspunkts relevant, weil
+Kontextlaenge nicht nur Speicher, sondern auch Geschwindigkeit kostet.
+
+## Methodische Anmerkungen
+
+**Speichermessung.** Primaerquelle sind die von llama.cpp gemeldeten Puffer
+(Gewichte, KV, SSM-State, Compute) und nicht `nvidia-smi`. Geraetweites
+Sampling enthaelt den Desktop-Overhead und ist damit die naive Variante; es
+bleibt nur als Gegenprobe erhalten (Differenz zum Log ~630 MB, im Wesentlichen
+der CUDA-Kontext). Ollamas eigenes `/api/ps` meldete 17044 statt 22952 MiB und
+unterschlaegt Compute-Puffer und CLIP -- als Quelle unbrauchbar.
+
+**Zwei korrigierte Messfehler.** Der Needle-Test zaehlte anfangs 0/5, weil
+qwen3.8 als Thinking-Modell das Token-Budget im Feld `thinking` verbraucht und
+`response` leer blieb; er laeuft jetzt mit `think:false`. Der Prefill-Durchsatz
+wurde um Groessenordnungen zu hoch ausgewiesen (213920 tok/s bei 128k), weil die
+Messlaeufe den Prompt-Cache des Warmups trafen: Ollama meldet dann die volle
+`prompt_eval_count`, aber nur die Dauer des ungecachten Rests. Jeder Lauf nutzt
+jetzt einen eindeutigen Prompt-Praefix.
+
 ## Offen
 
 - Needle-Retrieval und Perplexität über die Matrix (Gewicht × KV × Kontext)

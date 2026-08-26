@@ -139,6 +139,85 @@ def unload(host: str, model: str) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Puffer-Aufschluesselung aus dem llama.cpp-Log
+# ---------------------------------------------------------------------------
+
+# Geraetweites nvidia-smi ist eine naive Messung: Sie enthaelt den
+# Desktop-Overhead, der hier je nach geoeffneten Fenstern um bis zu 3 GB
+# schwankt. llama.cpp protokolliert seine Allokationen dagegen einzeln und
+# exakt. Das ist auf diesem Pfad das Gegenstueck zur tensorbasierten Messung
+# der Arbeit; nvidia-smi bleibt nur als Gegenprobe erhalten.
+BUFFER_PATTERNS = [
+    ("model_gpu_mib", r"load_tensors:\s+CUDA\d+ model buffer size\s*=\s*([\d.]+)"),
+    ("model_cpu_mib", r"load_tensors:\s+CPU_Mapped model buffer size\s*=\s*([\d.]+)"),
+    ("kv_mib", r"llama_kv_cache:\s+CUDA\d+ KV buffer size\s*=\s*([\d.]+)"),
+    ("recurrent_state_mib", r"llama_memory_recurrent:\s+CUDA\d+ RS buffer size\s*=\s*([\d.]+)"),
+    ("compute_gpu_mib", r"sched_reserve:\s+CUDA\d+ compute buffer size\s*=\s*([\d.]+)"),
+    ("compute_host_mib", r"sched_reserve:\s+CUDA_Host compute buffer size\s*=\s*([\d.]+)"),
+    ("clip_mib", r"load_hparams: model size:\s*([\d.]+)"),
+]
+
+
+def parse_llamacpp_buffers(container: str, since: str) -> dict:
+    """Liest die Puffergroessen aus dem Container-Log seit ``since``.
+
+    Mehrfachtreffer sind die Regel: qwen3.8 laedt neben dem Hauptkontext einen
+    MTP-Kopf (``nextn_predict_layers``) und den CLIP-Projektor, die eigene
+    Puffer melden. Der jeweils groesste Wert ist der Hauptkontext, die Summe
+    aller Treffer die tatsaechliche Belegung -- beides wird ausgewiesen.
+    """
+    try:
+        out = subprocess.run(
+            ["docker", "logs", "--since", since, container],
+            capture_output=True, text=True, timeout=60,
+        )
+    except Exception as exc:
+        return {"error": str(exc)[:200]}
+
+    log = (out.stdout or "") + (out.stderr or "")
+    buffers = {}
+    for name, pattern in BUFFER_PATTERNS:
+        vals = [float(m) for m in re.findall(pattern, log)]
+        if vals:
+            buffers[name] = round(max(vals), 2)
+            if len(vals) > 1:
+                buffers[name + "_sum"] = round(sum(vals), 2)
+                buffers[name + "_n"] = len(vals)
+
+    gpu_keys = ("model_gpu_mib", "kv_mib", "recurrent_state_mib",
+                "compute_gpu_mib", "clip_mib")
+    total = sum(buffers.get(k + "_sum", buffers.get(k, 0.0)) for k in gpu_keys)
+    if total:
+        buffers["total_gpu_mib"] = round(total, 2)
+
+    # Kontextunabhaengige Posten getrennt ausweisen: der SSM-State waechst
+    # nicht mit der Kontextlaenge und gehoert nicht in die KV-Skalierung.
+    if "kv_mib" in buffers:
+        buffers["kv_context_scaling_mib"] = buffers["kv_mib"]
+
+    if re.search(r"KV cache shifting is not supported", log):
+        buffers["kv_cache_shifting"] = False
+    return buffers
+
+
+def ollama_ps(host: str) -> dict:
+    """Ollamas eigene Buchfuehrung ueber das geladene Modell."""
+    try:
+        data = api_get(host, "/api/ps", timeout=30)
+    except Exception as exc:
+        return {"error": str(exc)[:200]}
+    models = data.get("models") or []
+    if not models:
+        return {}
+    m = models[0]
+    return {
+        "size_bytes": m.get("size"),
+        "size_vram_bytes": m.get("size_vram"),
+        "size_vram_mib": round((m.get("size_vram") or 0) / 2**20, 1),
+    }
+
+
+# ---------------------------------------------------------------------------
 # VRAM-Sampling
 # ---------------------------------------------------------------------------
 
@@ -216,13 +295,24 @@ def calibrate_chars_per_token(host: str, model: str, num_ctx: int) -> float:
     return len(probe) / tokens
 
 
-def build_haystack(target_tokens: int, chars_per_token: float, depth: float, code: str) -> str:
-    """Baut einen Fuelltext der Zielgroesse mit der Needle an relativer Tiefe."""
+def build_haystack(target_tokens: int, chars_per_token: float, depth: float, code: str,
+                   prefix: str = "") -> str:
+    """Baut einen Fuelltext der Zielgroesse mit der Needle an relativer Tiefe.
+
+    ``prefix`` steht ganz vorne und dient dazu, Ollamas Prompt-Cache gezielt zu
+    brechen. Ohne ihn trifft jeder Messlauf den Cache des Warmups: Ollama meldet
+    dann zwar die volle ``prompt_eval_count``, aber nur die Dauer des
+    ungecachten Rests -- der Prefill-Durchsatz wird dadurch um Groessenordnungen
+    zu hoch ausgewiesen (bei 128k gemessen: 213920 statt realistischer Werte).
+    """
     # Reserve fuer Frage und Needle, damit der Prompt das Fenster nicht sprengt.
     reserve_tokens = 96
     body_chars = int(max(target_tokens - reserve_tokens, 1) * chars_per_token)
     reps = max(int(body_chars / len(FILLER)) + 1, 1)
     body = (FILLER * reps)[:body_chars]
+
+    if prefix:
+        body = prefix + body[len(prefix):] if len(body) > len(prefix) else prefix + body
 
     needle = NEEDLE_TEMPLATE.format(code=code)
     cut = int(len(body) * depth)
@@ -251,19 +341,28 @@ def measure_context(
     warmup_runs: int,
     measure_runs: int,
     seed: int,
+    container: str,
 ) -> dict:
     """Misst Durchsatz, VRAM und Retrieval fuer eine Kontextlaenge."""
-    warm_prompt = build_haystack(context_len, chars_per_token, 0.5, needle_code(context_len, 0.5))
 
     # Sampler laeuft ab dem entladenen Zustand: die Baseline erfasst damit alles,
     # was sonst noch auf der Karte liegt, und der Peak schliesst den Ladevorgang
     # ein. Fuer die Budgetfrage zaehlt der Peak, nicht der eingeschwungene Wert.
     sampler = VramSampler()
     sampler.start()
+    load_start = time.time()
 
     print(f"  [ctx={context_len}] Warmup ...", flush=True)
-    for _ in range(warmup_runs):
-        generate(host, model, warm_prompt, context_len, num_predict=8, seed=seed)
+    for w in range(warmup_runs):
+        wp = build_haystack(context_len, chars_per_token, 0.5,
+                            needle_code(context_len, 0.5), prefix=f"[Warmup {w}] ")
+        generate(host, model, wp, context_len, num_predict=8, seed=seed)
+
+    # Direkt nach dem Laden auslesen, solange die Allokationszeilen dieses
+    # Kontexts die juengsten im Log sind.
+    since = f"{int(time.time() - load_start) + 5}s"
+    buffers = parse_llamacpp_buffers(container, since)
+    ps = ollama_ps(host)
 
     prefill_ms: List[float] = []
     decode_ms: List[float] = []
@@ -273,8 +372,13 @@ def measure_context(
 
     print(f"  [ctx={context_len}] {measure_runs} Messlaeufe ...", flush=True)
     for i in range(measure_runs):
+        # Eindeutiger Praefix je Lauf: sonst misst der Prefill den Prompt-Cache
+        # statt der tatsaechlichen Verarbeitung.
+        run_prompt = build_haystack(context_len, chars_per_token, 0.5,
+                                    needle_code(context_len, 0.5),
+                                    prefix=f"[Lauf {i}] ")
         resp = generate(
-            host, model, warm_prompt, context_len, num_predict=decode_tokens, seed=seed + i
+            host, model, run_prompt, context_len, num_predict=decode_tokens, seed=seed + i
         )
         pe_ns = resp.get("prompt_eval_duration", 0)
         pe_ct = resp.get("prompt_eval_count", 0)
@@ -295,7 +399,8 @@ def measure_context(
     per_depth = {}
     for depth in depths:
         code = needle_code(context_len, depth)
-        prompt = build_haystack(context_len, chars_per_token, depth, code)
+        prompt = build_haystack(context_len, chars_per_token, depth, code,
+                                prefix=f"[Needle {depth}] ")
         # think=False: sonst verbraucht das Reasoning das Token-Budget und
         # ``response`` bleibt leer, was faelschlich als Retrieval-Fehler zaehlt.
         resp = generate(
@@ -321,6 +426,10 @@ def measure_context(
         "decode_n_runs": len(decode_ms),
         "decode_tokens": decode_tokens,
         "decode_tokens_per_sec": round(statistics.median(decode_tps), 2) if decode_tps else None,
+        # Primaere Speichermessung: von llama.cpp selbst gemeldete Puffer.
+        "buffers": buffers,
+        "ollama_ps": ps,
+        # Gegenprobe, geraetweit und inkl. Desktop-Overhead -- nicht primaer.
         "vram_peak_mb": round(peak_mb, 1),
         "vram_baseline_mb": round(sampler.baseline_mb, 1),
         "needle": {
@@ -441,6 +550,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--measure-runs", type=int, default=3)
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--output-dir", default="../../results/ollama_probe/raw")
+    p.add_argument("--container", default="ollama-bench",
+                   help="Container, dessen llama.cpp-Log fuer die Pufferwerte gelesen wird")
     p.add_argument("--tag", default=None, help="Zusatzkennung im Dateinamen, z.B. trackB")
     return p
 
@@ -505,11 +616,14 @@ def main() -> int:
             m = measure_context(
                 args.host, args.model, ctx, cpt, args.needle_depths,
                 args.decode_tokens, args.warmup_runs, args.measure_runs, args.seed,
+                args.container,
             )
             measurements.append(m)
+            b = m.get("buffers", {})
             print(f"  -> prefill {m['prefill_tokens_per_sec']} tok/s | "
                   f"decode {m['decode_tokens_per_sec']} tok/s | "
-                  f"VRAM {m['vram_peak_mb']:.0f} MB | "
+                  f"KV {b.get('kv_mib', 0):.0f} MiB | "
+                  f"GPU gesamt {b.get('total_gpu_mib', 0):.0f} MiB | "
                   f"needle {m['needle']['successes']}/{m['needle']['trials']}")
         except Exception as exc:
             # OOM und Fenster-Ueberschreitungen sind selbst ein Messergebnis:

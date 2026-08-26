@@ -1,0 +1,188 @@
+{
+  "schema_version": "2.0",
+  "experiment_id": "qwen3_8_27b_kvq8_0_20260826_224738",
+  "timestamp": "2026-08-26T22:57:39",
+  "model": "qwen3.8:27b",
+  "model_config": {
+    "family": "qwen35",
+    "parameter_size": "27.3B",
+    "quantization_level": "Q4_K_M",
+    "architecture": "qwen35",
+    "num_layers": 65,
+    "num_q_heads": 24,
+    "num_kv_heads": 4,
+    "head_dim_k": 256,
+    "head_dim_v": 256,
+    "max_position_embeddings": 262144,
+    "full_attention_interval": 4,
+    "gqa_ratio": "6:1",
+    "kv_bearing_layers": 16
+  },
+  "runtime": {
+    "engine": "ollama/llama.cpp",
+    "host": "http://127.0.0.1:11435",
+    "weight_quant": "Q4_K_M",
+    "note": "Gewichte GGUF-quantisiert, nicht FP16 wie in der Arbeit; KV-Quantisierung durch llama.cpp, nicht quanto/HQQ."
+  },
+  "kv_quant": {
+    "enabled": true,
+    "kv_cache_type": "q8_0",
+    "backend": "llama.cpp",
+    "analytic_bytes_per_token": 34816.0
+  },
+  "hardware": {
+    "gpu_name": "NVIDIA GeForce RTX 5090",
+    "vram_total_mb": 32607.0,
+    "driver_version": "591.74"
+  },
+  "config": {
+    "seed": 42,
+    "warmup_runs": 1,
+    "measure_runs": 2,
+    "decode_tokens": 32,
+    "needle_depths": [
+      0.1,
+      0.5,
+      0.9
+    ],
+    "chars_per_token": 4.4975
+  },
+  "measurements": [
+    {
+      "context_len": 8192,
+      "prompt_tokens_measured": 8122,
+      "prefill_ms": 2708.827,
+      "prefill_ms_runs": [
+        2719.022,
+        2698.632
+      ],
+      "prefill_n_runs": 2,
+      "prefill_tokens_per_sec": 2998.39,
+      "decode_ms": 285.238,
+      "decode_ms_runs": [
+        270.789,
+        299.688
+      ],
+      "decode_n_runs": 2,
+      "decode_tokens": 32,
+      "decode_tokens_per_sec": 112.48,
+      "buffers": {
+        "model_gpu_mib": 15339.44,
+        "model_cpu_mib": 682.03,
+        "kv_mib": 272.0,
+        "kv_mib_sum": 608.0,
+        "kv_mib_n": 4,
+        "recurrent_state_mib": 748.12,
+        "recurrent_state_mib_sum": 1496.24,
+        "recurrent_state_mib_n": 2,
+        "compute_gpu_mib": 260.3,
+        "compute_gpu_mib_sum": 1560.72,
+        "compute_gpu_mib_n": 6,
+        "compute_host_mib": 56.3,
+        "compute_host_mib_sum": 336.76,
+        "compute_host_mib_n": 6,
+        "clip_mib": 887.99,
+        "clip_mib_sum": 1775.98,
+        "clip_mib_n": 2,
+        "total_gpu_mib": 20780.38,
+        "kv_context_scaling_mib": 272.0,
+        "kv_cache_shifting": false
+      },
+      "ollama_ps": {
+        "size_bytes": 17435396668,
+        "size_vram_bytes": 17435396668,
+        "size_vram_mib": 16627.7
+      },
+      "vram_peak_mb": 20272.0,
+      "vram_baseline_mb": 1674.0,
+      "needle": {
+        "trials": 3,
+        "successes": 3,
+        "success_rate": 1.0,
+        "per_depth": {
+          "0.1": {
+            "code": "000810",
+            "hit": true,
+            "answer": "000810"
+          },
+          "0.5": {
+            "code": "000850",
+            "hit": true,
+            "answer": "000850"
+          },
+          "0.9": {
+            "code": "000890",
+            "hit": true,
+            "answer": "000890"
+          }
+        }
+      }
+    },
+    {
+      "context_len": 131072,
+      "prompt_tokens_measured": 130389,
+      "prefill_ms": 84791.051,
+      "prefill_ms_runs": [
+        83654.884,
+        85927.218
+      ],
+      "prefill_n_runs": 2,
+      "prefill_tokens_per_sec": 1538.04,
+      "decode_ms": 562.397,
+      "decode_ms_runs": [
+        565.308,
+        559.485
+      ],
+      "decode_n_runs": 2,
+      "decode_tokens": 32,
+      "decode_tokens_per_sec": 56.9,
+      "buffers": {
+        "model_gpu_mib": 15339.44,
+        "model_cpu_mib": 682.03,
+        "kv_mib": 4352.0,
+        "kv_mib_sum": 4864.0,
+        "kv_mib_n": 2,
+        "recurrent_state_mib": 748.12,
+        "compute_gpu_mib": 720.28,
+        "compute_gpu_mib_sum": 1112.32,
+        "compute_gpu_mib_n": 3,
+        "compute_host_mib": 148.28,
+        "compute_host_mib_sum": 444.32,
+        "compute_host_mib_n": 3,
+        "clip_mib": 887.99,
+        "total_gpu_mib": 22951.87,
+        "kv_context_scaling_mib": 4352.0,
+        "kv_cache_shifting": false
+      },
+      "ollama_ps": {
+        "size_bytes": 17871593798,
+        "size_vram_bytes": 17871593798,
+        "size_vram_mib": 17043.7
+      },
+      "vram_peak_mb": 26125.0,
+      "vram_baseline_mb": 1612.0,
+      "needle": {
+        "trials": 3,
+        "successes": 3,
+        "success_rate": 1.0,
+        "per_depth": {
+          "0.1": {
+            "code": "012810",
+            "hit": true,
+            "answer": "012810"
+          },
+          "0.5": {
+            "code": "012850",
+            "hit": true,
+            "answer": "012850"
+          },
+          "0.9": {
+            "code": "012890",
+            "hit": true,
+            "answer": "012890"
+          }
+        }
+      }
+    }
+  ]
+}
