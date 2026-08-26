@@ -1,0 +1,3 @@
+# Maschinenspezifischer Pfad zum geteilten Ollama-Modellverzeichnis.
+# Vorlage: .env.example
+.env
