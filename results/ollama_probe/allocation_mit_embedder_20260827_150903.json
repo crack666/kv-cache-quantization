@@ -1,0 +1,20 @@
+{
+  "chars_per_token": 4.493041749502982,
+  "rows": [
+    {
+      "fill": 8192,
+      "num_ctx": 262144,
+      "prompt_tokens": 8096,
+      "decode_tps": 131.05,
+      "vram_loaded_mib": 27541.0,
+      "vram_delta_mib": 20947.0,
+      "decode_tps_runs": [
+        127.06,
+        134.43,
+        133.47,
+        114.81,
+        131.05
+      ]
+    }
+  ]
+}

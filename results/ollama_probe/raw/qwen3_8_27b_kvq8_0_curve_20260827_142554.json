@@ -1,0 +1,176 @@
+{
+  "schema_version": "2.0",
+  "experiment_id": "qwen3_8_27b_kvq8_0_curve_20260827_142554",
+  "timestamp": "2026-08-27T14:49:13",
+  "model": "qwen3.8:27b",
+  "model_config": {
+    "family": "qwen35",
+    "parameter_size": "27.3B",
+    "quantization_level": "Q4_K_M",
+    "architecture": "qwen35",
+    "num_layers": 65,
+    "num_q_heads": 24,
+    "num_kv_heads": 4,
+    "head_dim_k": 256,
+    "head_dim_v": 256,
+    "max_position_embeddings": 262144,
+    "full_attention_interval": 4,
+    "gqa_ratio": "6:1",
+    "kv_bearing_layers": 16
+  },
+  "runtime": {
+    "engine": "ollama/llama.cpp",
+    "host": "http://127.0.0.1:11435",
+    "weight_quant": "Q4_K_M",
+    "note": "Gewichte GGUF-quantisiert, nicht FP16 wie in der Arbeit; KV-Quantisierung durch llama.cpp, nicht quanto/HQQ."
+  },
+  "kv_quant": {
+    "enabled": true,
+    "kv_cache_type": "q8_0",
+    "backend": "llama.cpp",
+    "analytic_bytes_per_token": 34816.0
+  },
+  "hardware": {
+    "gpu_name": "NVIDIA GeForce RTX 5090",
+    "vram_total_mb": 32607.0,
+    "driver_version": "591.74"
+  },
+  "config": {
+    "seed": 42,
+    "warmup_runs": 1,
+    "measure_runs": 5,
+    "decode_tokens": 512,
+    "needle_depths": [
+      0.1,
+      0.25,
+      0.5,
+      0.75,
+      0.9
+    ],
+    "chars_per_token": 4.4975
+  },
+  "measurements": [
+    {
+      "context_len": 131072,
+      "prompt_tokens_measured": 130389,
+      "prefill_ms": 84092.88,
+      "prefill_ms_runs": [
+        84812.581,
+        84715.018,
+        84092.88,
+        84062.144,
+        84053.328
+      ],
+      "prefill_n_runs": 5,
+      "prefill_tokens_per_sec": 1550.54,
+      "decode_ms": 1358.735,
+      "decode_ms_runs": [
+        1405.376,
+        1360.397,
+        1358.735,
+        1350.585,
+        1338.048
+      ],
+      "decode_n_runs": 5,
+      "decode_tokens": 512,
+      "decode_tokens_per_sec": 79.49,
+      "buffers": {
+        "model_gpu_mib": 15339.44,
+        "model_cpu_mib": 682.03,
+        "kv_mib": 4352.0,
+        "kv_mib_sum": 4864.0,
+        "kv_mib_n": 2,
+        "recurrent_state_mib": 748.12,
+        "compute_gpu_mib": 720.28,
+        "compute_gpu_mib_sum": 1112.32,
+        "compute_gpu_mib_n": 3,
+        "compute_host_mib": 148.28,
+        "compute_host_mib_sum": 444.32,
+        "compute_host_mib_n": 3,
+        "clip_mib": 887.99,
+        "total_gpu_mib": 22951.87,
+        "kv_context_scaling_mib": 4352.0,
+        "kv_cache_shifting": false,
+        "kv_type_verified": true,
+        "kv_type_measured": "q8_0"
+      },
+      "ollama_ps": {
+        "size_bytes": 17871593798,
+        "size_vram_bytes": 17871593798,
+        "size_vram_mib": 17043.7
+      },
+      "vram_peak_mb": 27045.0,
+      "vram_baseline_mb": 3341.0,
+      "quality": {
+        "multi_needle": {
+          "facts": 5,
+          "hits": 5,
+          "hit_rate": 1.0,
+          "per_fact": {
+            "Serverraum Dresden": true,
+            "Notstromaggregat Leipzig": true,
+            "Kuehlkreislauf Muenchen": true,
+            "Ersatzteillager Hamburg": true,
+            "Rechenzentrum Berlin": true
+          },
+          "answer": "Rechenzentrum Berlin=0128003\nErsatzteillager Hamburg=0128010\nKuehlkreislauf Muenchen=0128017\nNotstromaggregat Leipzig=0128024\nServerraum Dresden=0128031"
+        },
+        "verbatim": {
+          "exact": true,
+          "similarity": 1.0,
+          "checksum_correct": true,
+          "factor_correct": true,
+          "clamp_correct": true,
+          "answer_len": 243,
+          "answer": "def rescale_tile(tile, factor=0.375, clamp=(-2048, 2048)):\n    lo, hi = clamp\n    scaled = [min(max(int(v * factor), lo), hi) for v in tile]\n    checksum = sum(scaled) % 65521\n    return {\"tile\": scaled, \"checksum\": checksum, \"factor\": factor}"
+        },
+        "greedy_samples": [
+          {
+            "task_index": 0,
+            "task": "Fasse den obigen Text in genau drei Saetzen zusammen.",
+            "output": "Die Verwaltung des Gebäudes plant die Wartung der Lüftungsanlage. Mitarbeiterinnen und Mitarbeiter werden gebeten, die Hinweise am schwarzen Brett zu beachten. Der Empfang bleibt während der Umbauphase durchgehend besetzt.",
+            "eval_count": 47
+          },
+          {
+            "task_index": 1,
+            "task": "Schreibe eine Python-Funktion, die aus dem obigen Text alle genannten Nummern ex",
+            "output": "```python\nimport re\n\ndef extract_numbers(text: str) -> list:\n    \"\"\"\n    Extrahiert alle genannten Nummern aus dem Text und gibt sie als sortierte Liste zurueck.\n    \"\"\"\n    # Findet alle Zahlen (ganze Zahlen und Dezimalzahlen)\n    matches = re.findall(r'\\d+(?:\\.\\d+)?', text)\n    \n    # Konvertiert zu Zahlen, sortiert und gibt zurueck\n    numbers = [float(num) if '.' in num else int(num) for num in matches]\n    return sorted(numbers)\n```",
+            "eval_count": 127
+          }
+        ]
+      },
+      "needle": {
+        "trials": 5,
+        "successes": 5,
+        "success_rate": 1.0,
+        "per_depth": {
+          "0.1": {
+            "code": "012810",
+            "hit": true,
+            "answer": "012810"
+          },
+          "0.25": {
+            "code": "012825",
+            "hit": true,
+            "answer": "012825"
+          },
+          "0.5": {
+            "code": "012850",
+            "hit": true,
+            "answer": "012850"
+          },
+          "0.75": {
+            "code": "012875",
+            "hit": true,
+            "answer": "012875"
+          },
+          "0.9": {
+            "code": "012890",
+            "hit": true,
+            "answer": "012890"
+          }
+        }
+      }
+    }
+  ]
+}
