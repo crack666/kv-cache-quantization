@@ -123,7 +123,11 @@ def build_rows(runs: List[dict]) -> List[dict]:
 
     rows = []
     for (model, kv, ctx), (r, m) in sorted(newest.items(), key=lambda kv_: str(kv_[0])):
-        weight = (r.get("model_config") or {}).get("quantization_level") or "?"
+        # Library- und UD-Modell melden beide "Q4_K_M"; ohne Herkunft waeren
+        # ihre Zeilen nicht auseinanderzuhalten.
+        qlevel = (r.get("model_config") or {}).get("quantization_level") or "?"
+        origin = "UD" if model.startswith("qwen3.8-ud") else "lib"
+        weight = f"{qlevel} ({origin})"
         if True:
             if "error" in m:
                 rows.append({
