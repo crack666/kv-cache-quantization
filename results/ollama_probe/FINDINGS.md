@@ -1,6 +1,6 @@
 # Arbeitspunkt qwen3.8-27b auf der RTX 5090
 
-**Stand:** 2026-08-27, 15:20 · **Branch:** `experiments/qwen3.8-27b-ollama`
+**Stand:** 2026-08-27, 18:45 · **Branch:** `experiments/qwen3.8-27b-ollama`
 **Nicht Teil der Masterarbeit** — interne Untersuchung zum produktiven Betrieb.
 
 **Leitfrage:** Welche Kombination aus Kontextlänge und KV-Quantisierung liefert das beste
@@ -14,22 +14,35 @@ gleichzeitig VRAM.
 
 ## 1. Empfehlung
 
-**Für den Alltag: `q4_0`-KV bei 131 072.** Gegenüber dem heutigen Stand (`q8_0`, 131 072)
-kostet das 4 % Durchsatz und bringt **2 GB Reserve** — genau den Betrag, um den euer
-Desktop schwankt. Damit hört die Konfiguration auf, auf Kante genäht zu sein.
+**Der Durchsatzgewinn liegt beim Runtime, nicht bei der Quantisierung.**
+vLLM mit dem RedHatAI-INT4-Checkpoint liefert bei 131 072 Token **118,1 tok/s
+gegen 79,5 unter Ollama — plus 48 %**, bei identischer Qualität und rund
+4,2 GB mehr Speicherbedarf. Der Prefill steigt um 45 %.
 
-**Wenn der lange Kontext gebraucht wird: 262 144, ebenfalls `q4_0`.** Das kostet bei
-kurzer Session nur 4,5 % und funktioniert ohne Reload für alles darunter — aber es bleibt
-nur **1 GB frei**, und leichtes Spilling ist messbar. Als Dauerkonfiguration nur, wenn
-sonst nichts Größeres auf der Karte liegt.
+| Bei 131 072 | Decode | Prefill | VRAM (Peak) | Qualität |
+|---|---:|---:|---:|---:|
+| **vLLM INT4, Graphs, KV-Pool begrenzt** | **118,1** | **2 251** | 27 151 MiB | 1,000 |
+| Ollama `q8_0` *(heute produktiv)* | 79,5 | 1 551 | 22 952 MiB | 1,000 |
+| Ollama `q4_0` | 76,5 | 1 509 | 20 904 MiB | 1,000 |
+| vLLM NVFP4, eager erzwungen | 28,1 | 547 | 32 086 MiB | 1,000 |
 
-**Als Kompromiss: 196 608.** 50 % mehr Fenster als heute, rund 2,4 GB Reserve.
+Bei 27 151 MiB Spitzenbelegung bleiben rund 5,4 GB frei — der Embedder mit
+4,2 GB passt daneben, Jarvis zusätzlich nicht.
 
-Was in jedem Fall gilt: **`f16`-KV hat keinen Grund mehr.** Es kostet bei 131 072 fast
-4 GB mehr als `q8_0` und ist mit 61,7 gegen 80,2 tok/s deutlich langsamer — die
-Qualität war in keiner einzigen Zelle besser.
+**Bleibt es bei Ollama, dann `q4_0` bei 131 072.** Das kostet 4 % Durchsatz und
+bringt 2 GB Reserve, also genau den Betrag, um den euer Desktop schwankt. Wer
+den langen Kontext braucht, kann bis 262 144 gehen: das kostet bei kurzer
+Session nur 4,5 %, lässt aber nur 1 GB frei.
 
----
+**`f16`-KV hat in keinem Fall einen Grund.** Es kostet bei 131 072 fast 4 GB
+mehr als `q8_0` und ist mit 61,7 gegen 79,5 tok/s deutlich langsamer, ohne je
+bessere Qualität zu liefern.
+
+**Was gegen den Wechsel spricht,** ist nicht die Leistung, sondern die
+Betriebsfrage: der ganze Stack (OpenClaw, Cline, n8n, TrueNAS-App) spricht heute
+Ollama-nativ. vLLM ist OpenAI-kompatibel, LiteLLM könnte davorstehen — aber die
+Clients müssten einmalig umgezogen werden. Diese Migration lohnt unabhängig vom
+Backend, weil sie die Clients entkoppelt.
 
 ## 2. Der zentrale Befund: Allokation ist gratis, Füllstand kostet
 
@@ -211,51 +224,57 @@ ob Upstream die `qwen35`-Architektur kennt, ist ungeprüft.
 
 ---
 
-## 9. Recherche: vLLM und NVFP4
+## 9. vLLM: gemessen
 
-**vLLM unterstützt das Modell offiziell** (eigene Recipe, min. 0.17.0). MTP-Draft
-funktioniert dort mit Akzeptanzraten von 0,754–0,897 — deutlich über den 0,39–0,86 hier
-im Ollama-Log. Dazu **PagedAttention**: der KV-Cache wird in 16-Token-Blöcken aus einem
-Pool zugeteilt statt je Slot vorab reserviert. Ein Server bedient damit kurze und lange
-Anfragen ohne Reload — was Ollama nicht kann. Und **Sleep Mode** (`POST /sleep`,
-`/wake_up`) gibt über 90 % des VRAM frei und weckt große Modelle in 3–6 s.
+**Entscheidend ist, ob die CUDA-Graphs passen.** Die vLLM-Recipe verlangt
+`--enforce-eager` auf einer einzelnen 5090 — das gilt aber nur für Checkpoints,
+die zu groß für das Graph-Capture sind. Der Unterschied ist dramatisch:
 
-**Der Haken sind die Gewichte, nicht das Cache-Management:**
+| Checkpoint | Gewichte | Graphs | Decode @131 072 |
+|---|---:|---|---:|
+| RedHatAI INT4 | 17,95 GiB | ✓ | **118,1** tok/s |
+| unsloth NVFP4 | 21,81 GiB | ✗ OOM im Capture | 28,1 tok/s |
 
-| Checkpoint | Gewichte | MTP |
-|---|---:|---|
-| GGUF Q4_K_M *(aktuell)* | **15,33 GiB** | ja |
-| gittensor NVFP4-RTX5090 | 17,48 GiB | nein |
-| **RedHatAI INT4** | 18,12 GiB | **ja** |
-| QUASAR NVFP4 | 18,36 GiB | nein |
-| cyankiwi AWQ-INT4 | 19,57 GiB | nein |
-| RadixArk NVFP4 | 20,42 GiB | nein |
-| **unsloth NVFP4** *(heruntergeladen)* | 21,81 GiB | ja |
+Die 3,7 GiB Unterschied entscheiden also nicht über den Speicher, sondern über
+den Durchsatz — sie sind genau die Reserve, die das Graph-Capture braucht. Ohne
+Graphs zahlt jede Decode-Iteration den vollen Kernel-Launch-Overhead. Für INT4
+allein gemessen: 45,3 mit eager gegen 133,1 tok/s mit Graphs.
 
-„NVFP4" ist bei unsloth mixed precision — `U8`, `F8_E4M3` und `BF16`, effektiv ~6,4 Bit
-statt 4. Dazu kommt vLLMs KV-Untergrenze von FP8 (32 KiB/Token gegen 18 bei `q4_0`).
+**Speicher lässt sich begrenzen, ohne Leistung zu verlieren.** Mit
+`--gpu-memory-utilization 0.92` nimmt vLLM rund 30 GB und dimensioniert den
+KV-Pool auf 214 849 Token. Über `--kv-cache-memory` auf 5,5 GiB begrenzt
+(143 233 Token, reicht für 131 072) sinkt die Belegung auf 25 888 MiB im
+Leerlauf und 27 151 MiB unter Last — bei **unverändertem Durchsatz**
+(118,1 gegen 117,9 tok/s). Der großzügige Pool bringt nichts außer Belegung.
 
-Mit 8 GB freigehalten für Jarvis und fish-speech:
+**KV-Kosten je Token**, aus den Kapazitätsmeldungen zurückgerechnet:
 
-| | nutzbarer Kontext |
+| Pfad | KiB/Token |
 |---|---:|
-| Ollama Q4_K_M | **~173 000** |
-| RedHatAI INT4 | ~80 000 |
-| unsloth NVFP4 | ~25 000 |
+| llama.cpp `q4_0` | 18,0 |
+| llama.cpp `q8_0` | 34,0 |
+| vLLM FP8 | **40,5** |
 
-Für Koexistenz mit anderen Diensten bleibt Ollama vorn — schlicht wegen der 15,33 GiB.
-Für einen dedizierten LLM-Betrieb wäre RedHatAI INT4 mit PagedAttention und MTP der
-interessantere Kandidat.
+vLLM braucht je Token also 2,25-mal so viel wie `q4_0`. Vermutlich liegt der
+DeltaNet-State mit im Pool, den llama.cpp separat als 748 MiB führt.
 
-Auf einer einzelnen 5090 ist `--enforce-eager` Pflicht (sonst OOM im CUDA-Graph-Capture),
-was ausgerechnet Durchsatz kostet. `--language-model-only` gibt Vision auf und hebt die
-KV-Kapazität von 91k auf 136k Token, `--max-num-seqs 8` auf 153k.
+**Spekulatives Decoding** läuft unter vLLM besser: mittlere Akzeptanzlänge
+3,0–4,0 bei 68–100 % Draft-Akzeptanz, gegen ~2,7 unter Ollama. Das erklärt einen
+Teil des Vorsprungs.
+
+**PagedAttention und Sleep Mode** sind reale Vorteile, die in dieser Messreihe
+nicht zum Tragen kamen: der KV-Cache wird in 16-Token-Blöcken zugeteilt statt je
+Slot reserviert, ein Server bedient also kurze und lange Anfragen ohne Reload.
+`POST /sleep` gibt über 90 % des VRAM frei und weckt in 3–6 s — für einen
+Batch-Dienst ideal, für Jarvis als Sprachassistent vermutlich zu langsam.
+
+**Nicht getestete Checkpoints,** die kleiner sind und damit ebenfalls Graphs
+erlauben dürften: gittensor NVFP4-RTX5090 (17,48 GiB, ohne MTP), QUASAR NVFP4
+(18,36 GiB, ohne MTP), cyankiwi AWQ-INT4 (19,57 GiB, ohne MTP). Ohne MTP-Kopf
+entfällt das spekulative Decoding, was einen Teil des Vorsprungs kosten dürfte.
 
 Quellen: [vLLM Recipe](https://recipes.vllm.ai/Qwen/Qwen3.8-27B) ·
-[Sleep Mode](https://docs.vllm.ai/en/latest/features/sleep_mode/) ·
-[unsloth NVFP4](https://huggingface.co/unsloth/Qwen3.8-27B-NVFP4)
-
----
+[Sleep Mode](https://docs.vllm.ai/en/latest/features/sleep_mode/)
 
 ## 10. Messfallen (alle real aufgetreten)
 
@@ -290,6 +309,18 @@ Vergleiche nur zwischen Zellen mit demselben Prompt. Derselbe Effekt erklärt, w
 
 **Erste Generierung nach dem Laden läuft ohne Draft.** 48 statt 131 tok/s — kein
 Speicherproblem, sondern ein Kaltstart-Artefakt. Steht auch in `UBUNTU_AB_TEST.md`.
+
+**Der rohe Completion-Endpunkt umgeht Chat-Template und Reasoning-Parser.**
+Über `/v1/completions` landete bei vLLM das Reasoning als `<think>...` im
+Antworttext und fraß das Token-Budget — Needle 0/5 bei intaktem Modell.
+`/v1/chat/completions` mit `chat_template_kwargs: {"enable_thinking": false}`
+löst es; derselbe Checkpoint liefert dann 5/5.
+
+**Flags aus fremden Konfigurationen nicht ungeprüft übernehmen.**
+`--enforce-eager` stammt aus der vLLM-Recipe und ist dort für NVFP4 richtig.
+Für den kleineren INT4-Checkpoint übernommen, drittelte es den Durchsatz
+(45 statt 133 tok/s), ohne dass etwas darauf hingedeutet hätte — der Server
+startete normal.
 
 **Ollamas `/api/ps` unterschlägt Speicher.** 17 044 statt 22 952 MiB — Compute-Puffer und
 CLIP fehlen. Die llama.cpp-Logzeilen sind maßgeblich.

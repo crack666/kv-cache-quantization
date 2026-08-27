@@ -1,0 +1,200 @@
+{
+  "schema_version": "2.0",
+  "experiment_id": "vllm_int4-graphs_20260827_180952",
+  "timestamp": "2026-08-27T18:26:29",
+  "model": "qwen3.8-int4",
+  "runtime": {
+    "engine": "vllm",
+    "host": "http://127.0.0.1:11436",
+    "checkpoint": "int4-graphs",
+    "note": "VRAM aus nvidia-smi, nicht aus Puffermeldungen -- vLLM allokiert ueber gpu-memory-utilization vorab und schluesselt nicht auf. Nicht mit den llama.cpp-Puffersummen vergleichbar."
+  },
+  "config": {
+    "seed": 42,
+    "warmup_runs": 1,
+    "measure_runs": 5,
+    "decode_tokens": 512,
+    "needle_depths": [
+      0.1,
+      0.25,
+      0.5,
+      0.75,
+      0.9
+    ],
+    "chars_per_token": 4.493
+  },
+  "measurements": [
+    {
+      "context_len": 32768,
+      "prompt_tokens_measured": 31572,
+      "ttft_ms": 9451.2,
+      "prefill_tokens_per_sec": 3340.53,
+      "decode_tokens_per_sec": 135.03,
+      "decode_tps_runs": [
+        129.96,
+        132.08,
+        135.03,
+        142.71,
+        137.74
+      ],
+      "decode_tokens": 512,
+      "vram_after_load_mib": 29926.0,
+      "quality": {
+        "multi_needle": {
+          "facts": 5,
+          "hits": 5,
+          "hit_rate": 1.0,
+          "per_fact": {
+            "Serverraum Dresden": true,
+            "Notstromaggregat Leipzig": true,
+            "Kuehlkreislauf Muenchen": true,
+            "Ersatzteillager Hamburg": true,
+            "Rechenzentrum Berlin": true
+          },
+          "answer": "Rechenzentrum Berlin=0032003\nErsatzteillager Hamburg=0032010\nKuehlkreislauf Muenchen=0032017\nNotstromaggregat Leipzig=0032024\nServerraum Dresden=0032031"
+        },
+        "verbatim": {
+          "exact": true,
+          "similarity": 1.0,
+          "checksum_correct": true,
+          "factor_correct": true,
+          "clamp_correct": true,
+          "answer_len": 243,
+          "answer": "def rescale_tile(tile, factor=0.375, clamp=(-2048, 2048)):\n    lo, hi = clamp\n    scaled = [min(max(int(v * factor), lo), hi) for v in tile]\n    checksum = sum(scaled) % 65521\n    return {\"tile\": scaled, \"checksum\": checksum, \"factor\": factor}"
+        },
+        "greedy_samples": [
+          {
+            "task_index": 0,
+            "task": "Fasse den obigen Text in genau drei Saetzen zusammen.",
+            "output": "Die Verwaltung des Gebäudes plant die Wartung der Lüftungsanlage. Mitarbeiterinnen und Mitarbeiter werden gebeten, die Hinweise am schwarzen Brett zu beachten. Der Empfang bleibt während der Umbauphase durchgehend besetzt.",
+            "eval_count": 47
+          },
+          {
+            "task_index": 1,
+            "task": "Schreibe eine Python-Funktion, die aus dem obigen Text alle genannten Nummern ex",
+            "output": "```python\nimport re\n\ndef extract_numbers(text: str) -> list:\n    numbers = re.findall(r'\\d+', text)\n    return sorted(int(n) for n in numbers)\n```",
+            "eval_count": 43
+          }
+        ]
+      },
+      "needle": {
+        "trials": 5,
+        "successes": 5,
+        "success_rate": 1.0,
+        "per_depth": {
+          "0.1": {
+            "code": "003210",
+            "hit": true,
+            "answer": "003210"
+          },
+          "0.25": {
+            "code": "003225",
+            "hit": true,
+            "answer": "003225"
+          },
+          "0.5": {
+            "code": "003250",
+            "hit": true,
+            "answer": "003250"
+          },
+          "0.75": {
+            "code": "003275",
+            "hit": true,
+            "answer": "003275"
+          },
+          "0.9": {
+            "code": "003290",
+            "hit": true,
+            "answer": "003290"
+          }
+        }
+      }
+    },
+    {
+      "context_len": 131072,
+      "prompt_tokens_measured": 129289,
+      "ttft_ms": 57362.1,
+      "prefill_tokens_per_sec": 2253.91,
+      "decode_tokens_per_sec": 117.85,
+      "decode_tps_runs": [
+        117.77,
+        125.78,
+        117.85,
+        116.69,
+        121.79
+      ],
+      "decode_tokens": 512,
+      "vram_after_load_mib": 29949.0,
+      "quality": {
+        "multi_needle": {
+          "facts": 5,
+          "hits": 5,
+          "hit_rate": 1.0,
+          "per_fact": {
+            "Serverraum Dresden": true,
+            "Notstromaggregat Leipzig": true,
+            "Kuehlkreislauf Muenchen": true,
+            "Ersatzteillager Hamburg": true,
+            "Rechenzentrum Berlin": true
+          },
+          "answer": "Rechenzentrum Berlin=0128003\nErsatzteillager Hamburg=0128010\nKuehlkreislauf Muenchen=0128017\nNotstromaggregat Leipzig=0128024\nServerraum Dresden=0128031"
+        },
+        "verbatim": {
+          "exact": true,
+          "similarity": 1.0,
+          "checksum_correct": true,
+          "factor_correct": true,
+          "clamp_correct": true,
+          "answer_len": 243,
+          "answer": "def rescale_tile(tile, factor=0.375, clamp=(-2048, 2048)):\n    lo, hi = clamp\n    scaled = [min(max(int(v * factor), lo), hi) for v in tile]\n    checksum = sum(scaled) % 65521\n    return {\"tile\": scaled, \"checksum\": checksum, \"factor\": factor}"
+        },
+        "greedy_samples": [
+          {
+            "task_index": 0,
+            "task": "Fasse den obigen Text in genau drei Saetzen zusammen.",
+            "output": "Die Verwaltung des Gebäudes plant die Wartung der Lüftungsanlage. Mitarbeiterinnen und Mitarbeiter werden gebeten, die Hinweise am schwarzen Brett zu beachten. Der Empfang bleibt während der Umbauphase durchgehend besetzt.",
+            "eval_count": 47
+          },
+          {
+            "task_index": 1,
+            "task": "Schreibe eine Python-Funktion, die aus dem obigen Text alle genannten Nummern ex",
+            "output": "```python\nimport re\n\ndef extract_numbers(text: str) -> list:\n    numbers = re.findall(r'\\d+', text)\n    return sorted(int(n) for n in numbers)\n```",
+            "eval_count": 43
+          }
+        ]
+      },
+      "needle": {
+        "trials": 5,
+        "successes": 5,
+        "success_rate": 1.0,
+        "per_depth": {
+          "0.1": {
+            "code": "012810",
+            "hit": true,
+            "answer": "012810"
+          },
+          "0.25": {
+            "code": "012825",
+            "hit": true,
+            "answer": "012825"
+          },
+          "0.5": {
+            "code": "012850",
+            "hit": true,
+            "answer": "012850"
+          },
+          "0.75": {
+            "code": "012875",
+            "hit": true,
+            "answer": "012875"
+          },
+          "0.9": {
+            "code": "012890",
+            "hit": true,
+            "answer": "012890"
+          }
+        }
+      }
+    }
+  ]
+}

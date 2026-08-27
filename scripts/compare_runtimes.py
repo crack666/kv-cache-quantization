@@ -31,8 +31,9 @@ WEIGHTS_GIB = {
     "qwen3.8:27b": 15.33,
     "qwen3.8-udv:27b-q4_K_M": 15.33,
     "qwen3.8-ud:27b-q4_K_M": 15.33,
-    "nvfp4": 21.81,
-    "int4": 18.12,
+    "nvfp4": 21.81, "nvfp4-eager": 21.81, "nvfp4-graphs": 21.81,
+    "int4": 18.12, "int4-graphs": 18.12, "int4-eager": 18.12,
+    "int4-tuned": 18.12,
 }
 
 
