@@ -356,7 +356,12 @@ def plot_vram_vs_context(summaries):
 
 def plot_delta_ppl_heatmap(summaries):
     quants = ["int8-hqq", "int4-hqq", "int2-hqq", "int2-hqq(kivi)"]
-    models = sorted(summaries.keys())
+    # Rows ascending by mean key kurtosis (same order as the summary tables
+    # in the thesis), so the kurtosis/degradation relationship is readable
+    # top-to-bottom. Unknown models fall back to the end, alphabetically.
+    KURTOSIS_ORDER = ["Gemma-4-E4B", "Mistral-7B", "Yi-1.5-9B", "Qwen2-7B", "Qwen3-8B"]
+    models = [m for m in KURTOSIS_ORDER if m in summaries] + \
+             sorted(m for m in summaries if m not in KURTOSIS_ORDER)
 
     # Build matrix with the raw |delta| values. The color scale is capped at
     # 100 further down (via np.clip), but the cell annotations must show the
@@ -420,9 +425,9 @@ def plot_delta_ppl_heatmap(summaries):
     ax.set_xticklabels([quant_display[q] for q in quants])
     ax.set_yticks(range(len(models)))
     ax.set_yticklabels(models)
-    ax.set_title("|Δ-PPL| Heatmap (höchste Kontextlänge je Modell, WikiText-2)\n"
-                 "Grün = verlustfrei, Rot = starke Degradation (log scale)",
-                 fontsize=12)
+    # No in-figure title: the caption and the accompanying paragraph in the
+    # thesis carry the explanation; a second headline above the plot reads
+    # like a competing caption.
 
     cbar = fig.colorbar(im, ax=ax, shrink=0.8)
     cbar.set_label("|Δ-PPL|", fontsize=10)
