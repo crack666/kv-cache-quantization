@@ -44,6 +44,8 @@ from typing import Dict, List, Optional
 import urllib.error
 import urllib.request
 
+import quality_probe
+
 SCHEMA_VERSION = "2.0"
 NS_PER_S = 1_000_000_000
 
@@ -175,6 +177,16 @@ def parse_llamacpp_buffers(container: str, since: str) -> dict:
         return {"error": str(exc)[:200]}
 
     log = (out.stdout or "") + (out.stderr or "")
+
+    # Auf den LETZTEN Ladevorgang zuschneiden. Ein rein zeitbasiertes Fenster
+    # reicht nicht: bei zu weitem Abstand geraten die Puffer frueherer
+    # Kontexte mit in die Summe. Mit 3600s-Fenster gemessen: 36120 MiB statt
+    # 18060, also glatt zwei Ladevorgaenge addiert. Jeder Load beginnt mit
+    # llama_model_loader.
+    marker = log.rfind("llama_model_loader:")
+    if marker != -1:
+        log = log[marker:]
+
     buffers = {}
     for name, pattern in BUFFER_PATTERNS:
         vals = [float(m) for m in re.findall(pattern, log)]
@@ -322,6 +334,21 @@ def build_haystack(target_tokens: int, chars_per_token: float, depth: float, cod
     return body[:cut] + " " + needle + " " + body[cut:] + NEEDLE_QUESTION
 
 
+def build_body(target_tokens: int, chars_per_token: float, prefix: str = "") -> str:
+    """Reiner Fuelltext der Zielgroesse, ohne Needle und ohne Frage.
+
+    Die Qualitaetssonden setzen ihre eigenen Inhalte hinein und brauchen
+    deshalb einen unbeschriebenen Koerper.
+    """
+    reserve_tokens = 420  # Platz fuer Sondeninhalte und Frage
+    body_chars = int(max(target_tokens - reserve_tokens, 1) * chars_per_token)
+    reps = max(int(body_chars / len(FILLER)) + 1, 1)
+    body = (FILLER * reps)[:body_chars]
+    if prefix:
+        body = prefix + body[len(prefix):] if len(body) > len(prefix) else prefix + body
+    return body
+
+
 def needle_code(context_len: int, depth: float) -> str:
     """Deterministischer, je Zelle eindeutiger Code."""
     return f"{(context_len // 1024) * 100 + int(depth * 100):06d}"
@@ -360,7 +387,9 @@ def measure_context(
 
     # Direkt nach dem Laden auslesen, solange die Allokationszeilen dieses
     # Kontexts die juengsten im Log sind.
-    since = f"{int(time.time() - load_start) + 5}s"
+    # Fenster darf grosszuegig sein: die Praezision liefert der Zuschnitt auf
+    # den letzten Ladevorgang, nicht die Zeitgrenze.
+    since = f"{int(time.time() - load_start) + 120}s"
     buffers = parse_llamacpp_buffers(container, since)
     ps = ollama_ps(host)
 
@@ -412,6 +441,18 @@ def measure_context(
         successes += int(hit)
         per_depth[str(depth)] = {"code": code, "hit": hit, "answer": answer.strip()[:120]}
 
+    # Qualitaetssonden: feinkoerniger als der Einzel-Needle, siehe
+    # quality_probe.py. Jede Sonde bekommt einen eigenen Praefix, damit sie
+    # nicht den Prompt-Cache der vorigen trifft.
+    print(f"  [ctx={context_len}] Qualitaetssonden ...", flush=True)
+
+    def _gen(prompt: str, num_predict: int, seed: int, think: bool = False) -> dict:
+        return generate(host, model, prompt, context_len, num_predict=num_predict,
+                        seed=seed, think=think)
+
+    probe_body = build_body(context_len, chars_per_token, prefix="[Sonde] ")
+    quality = quality_probe.run_all(_gen, context_len, probe_body, seed)
+
     peak_mb = sampler.stop()
 
     return {
@@ -432,6 +473,7 @@ def measure_context(
         # Gegenprobe, geraetweit und inkl. Desktop-Overhead -- nicht primaer.
         "vram_peak_mb": round(peak_mb, 1),
         "vram_baseline_mb": round(sampler.baseline_mb, 1),
+        "quality": quality,
         "needle": {
             "trials": trials,
             "successes": successes,
@@ -625,6 +667,11 @@ def main() -> int:
                   f"KV {b.get('kv_mib', 0):.0f} MiB | "
                   f"GPU gesamt {b.get('total_gpu_mib', 0):.0f} MiB | "
                   f"needle {m['needle']['successes']}/{m['needle']['trials']}")
+            q = m.get("quality", {})
+            mn = q.get("multi_needle", {})
+            vb = q.get("verbatim", {})
+            print(f"     multi-needle {mn.get('hits', '?')}/{mn.get('facts', '?')} | "
+                  f"verbatim sim={vb.get('similarity', '?')} exact={vb.get('exact', '?')}")
         except Exception as exc:
             # OOM und Fenster-Ueberschreitungen sind selbst ein Messergebnis:
             # sie markieren die Grenze des Budgets und gehoeren in die Front.
