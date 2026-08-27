@@ -1,0 +1,374 @@
+{
+  "schema_version": "2.0",
+  "experiment_id": "qwen3_8_ud_27b_q6_k_kvf16_p1_20260827_042217",
+  "timestamp": "2026-08-27T05:30:33",
+  "model": "qwen3.8-ud:27b-q6_K",
+  "model_config": {
+    "family": "qwen35",
+    "parameter_size": "27.3B",
+    "quantization_level": "Q6_K",
+    "architecture": "qwen35",
+    "num_layers": 65,
+    "num_q_heads": 24,
+    "num_kv_heads": 4,
+    "head_dim_k": 256,
+    "head_dim_v": 256,
+    "max_position_embeddings": 262144,
+    "full_attention_interval": 4,
+    "gqa_ratio": "6:1",
+    "kv_bearing_layers": 16
+  },
+  "runtime": {
+    "engine": "ollama/llama.cpp",
+    "host": "http://127.0.0.1:11435",
+    "weight_quant": "Q6_K",
+    "note": "Gewichte GGUF-quantisiert, nicht FP16 wie in der Arbeit; KV-Quantisierung durch llama.cpp, nicht quanto/HQQ."
+  },
+  "kv_quant": {
+    "enabled": false,
+    "kv_cache_type": "f16",
+    "backend": "llama.cpp",
+    "analytic_bytes_per_token": 65536.0
+  },
+  "hardware": {
+    "gpu_name": "NVIDIA GeForce RTX 5090",
+    "vram_total_mb": 32607.0,
+    "driver_version": "591.74"
+  },
+  "config": {
+    "seed": 42,
+    "warmup_runs": 1,
+    "measure_runs": 2,
+    "decode_tokens": 128,
+    "needle_depths": [
+      0.1,
+      0.25,
+      0.5,
+      0.75,
+      0.9
+    ],
+    "chars_per_token": 4.4055
+  },
+  "measurements": [
+    {
+      "context_len": 8192,
+      "prompt_tokens_measured": 7997,
+      "prefill_ms": 2581.798,
+      "prefill_ms_runs": [
+        2650.502,
+        2513.094
+      ],
+      "prefill_n_runs": 2,
+      "prefill_tokens_per_sec": 3099.65,
+      "decode_ms": 2195.121,
+      "decode_ms_runs": [
+        2198.419,
+        2191.823
+      ],
+      "decode_n_runs": 2,
+      "decode_tokens": 128,
+      "decode_tokens_per_sec": 58.31,
+      "buffers": {
+        "model_gpu_mib": 19625.41,
+        "kv_mib": 512.0,
+        "recurrent_state_mib": 149.62,
+        "compute_gpu_mib": 260.03,
+        "compute_host_mib": 56.04,
+        "total_gpu_mib": 20547.06,
+        "kv_context_scaling_mib": 512.0,
+        "kv_cache_shifting": false
+      },
+      "ollama_ps": {
+        "size_bytes": 21545153986,
+        "size_vram_bytes": 21545153986,
+        "size_vram_mib": 20547.1
+      },
+      "vram_peak_mb": 24156.0,
+      "vram_baseline_mb": 2933.0,
+      "quality": {
+        "multi_needle": {
+          "facts": 5,
+          "hits": 5,
+          "hit_rate": 1.0,
+          "per_fact": {
+            "Serverraum Dresden": true,
+            "Notstromaggregat Leipzig": true,
+            "Kuehlkreislauf Muenchen": true,
+            "Ersatzteillager Hamburg": true,
+            "Rechenzentrum Berlin": true
+          },
+          "answer": "Rechenzentrum Berlin=0008003\nErsatzteillager Hamburg=0008010\nKuehlkreislauf Muenchen=0008017\nNotstromaggregat Leipzig=0008024\nServerraum Dresden=0008031"
+        },
+        "verbatim": {
+          "exact": true,
+          "similarity": 1.0,
+          "checksum_correct": true,
+          "factor_correct": true,
+          "clamp_correct": true,
+          "answer_len": 243,
+          "answer": "def rescale_tile(tile, factor=0.375, clamp=(-2048, 2048)):\n    lo, hi = clamp\n    scaled = [min(max(int(v * factor), lo), hi) for v in tile]\n    checksum = sum(scaled) % 65521\n    return {\"tile\": scaled, \"checksum\": checksum, \"factor\": factor}"
+        },
+        "greedy_samples": [
+          {
+            "task_index": 0,
+            "task": "Fasse den obigen Text in genau drei Saetzen zusammen.",
+            "output": "Die Verwaltung des Gebäudes plant die Wartung der Lüftungsanlage. Mitarbeiterinnen und Mitarbeiter werden gebeten, die Hinweise am schwarzen Brett zu beachten. Der Empfang bleibt während der Umbauphase durchgehend besetzt.",
+            "eval_count": 47
+          },
+          {
+            "task_index": 1,
+            "task": "Schreibe eine Python-Funktion, die aus dem obigen Text alle genannten Nummern ex",
+            "output": "```python\nimport re\n\ndef extract_numbers(text: str) -> list:\n    numbers = re.findall(r'\\d+', text)\n    return sorted(int(n) for n in numbers)\n```",
+            "eval_count": 43
+          }
+        ]
+      },
+      "needle": {
+        "trials": 5,
+        "successes": 5,
+        "success_rate": 1.0,
+        "per_depth": {
+          "0.1": {
+            "code": "000810",
+            "hit": true,
+            "answer": "000810"
+          },
+          "0.25": {
+            "code": "000825",
+            "hit": true,
+            "answer": "000825"
+          },
+          "0.5": {
+            "code": "000850",
+            "hit": true,
+            "answer": "000850"
+          },
+          "0.75": {
+            "code": "000875",
+            "hit": true,
+            "answer": "000875"
+          },
+          "0.9": {
+            "code": "000890",
+            "hit": true,
+            "answer": "000890"
+          }
+        }
+      }
+    },
+    {
+      "context_len": 32768,
+      "prompt_tokens_measured": 31951,
+      "prefill_ms": 11213.962,
+      "prefill_ms_runs": [
+        11230.597,
+        11197.327
+      ],
+      "prefill_n_runs": 2,
+      "prefill_tokens_per_sec": 2849.22,
+      "decode_ms": 2326.484,
+      "decode_ms_runs": [
+        2324.178,
+        2328.79
+      ],
+      "decode_n_runs": 2,
+      "decode_tokens": 128,
+      "decode_tokens_per_sec": 55.02,
+      "buffers": {
+        "model_gpu_mib": 19625.41,
+        "model_cpu_mib": 994.63,
+        "kv_mib": 2048.0,
+        "recurrent_state_mib": 149.62,
+        "compute_gpu_mib": 154.02,
+        "compute_host_mib": 52.02,
+        "total_gpu_mib": 21977.05,
+        "kv_context_scaling_mib": 2048.0,
+        "kv_cache_shifting": false
+      },
+      "ollama_ps": {
+        "size_bytes": 23044607180,
+        "size_vram_bytes": 23044607180,
+        "size_vram_mib": 21977.0
+      },
+      "vram_peak_mb": 25583.0,
+      "vram_baseline_mb": 2937.0,
+      "quality": {
+        "multi_needle": {
+          "facts": 5,
+          "hits": 5,
+          "hit_rate": 1.0,
+          "per_fact": {
+            "Serverraum Dresden": true,
+            "Notstromaggregat Leipzig": true,
+            "Kuehlkreislauf Muenchen": true,
+            "Ersatzteillager Hamburg": true,
+            "Rechenzentrum Berlin": true
+          },
+          "answer": "Rechenzentrum Berlin=0032003\nErsatzteillager Hamburg=0032010\nKuehlkreislauf Muenchen=0032017\nNotstromaggregat Leipzig=0032024\nServerraum Dresden=0032031"
+        },
+        "verbatim": {
+          "exact": true,
+          "similarity": 1.0,
+          "checksum_correct": true,
+          "factor_correct": true,
+          "clamp_correct": true,
+          "answer_len": 243,
+          "answer": "def rescale_tile(tile, factor=0.375, clamp=(-2048, 2048)):\n    lo, hi = clamp\n    scaled = [min(max(int(v * factor), lo), hi) for v in tile]\n    checksum = sum(scaled) % 65521\n    return {\"tile\": scaled, \"checksum\": checksum, \"factor\": factor}"
+        },
+        "greedy_samples": [
+          {
+            "task_index": 0,
+            "task": "Fasse den obigen Text in genau drei Saetzen zusammen.",
+            "output": "Die Verwaltung des Gebäudes plant die Wartung der Lüftungsanlage. Mitarbeiterinnen und Mitarbeiter werden gebeten, die Hinweise am schwarzen Brett zu beachten. Der Empfang bleibt während der Umbauphase durchgehend besetzt.",
+            "eval_count": 47
+          },
+          {
+            "task_index": 1,
+            "task": "Schreibe eine Python-Funktion, die aus dem obigen Text alle genannten Nummern ex",
+            "output": "```python\nimport re\n\ndef extract_numbers(text: str) -> list:\n    numbers = re.findall(r'\\d+', text)\n    return sorted(int(n) for n in numbers)\n```",
+            "eval_count": 43
+          }
+        ]
+      },
+      "needle": {
+        "trials": 5,
+        "successes": 5,
+        "success_rate": 1.0,
+        "per_depth": {
+          "0.1": {
+            "code": "003210",
+            "hit": true,
+            "answer": "003210"
+          },
+          "0.25": {
+            "code": "003225",
+            "hit": true,
+            "answer": "003225"
+          },
+          "0.5": {
+            "code": "003250",
+            "hit": true,
+            "answer": "003250"
+          },
+          "0.75": {
+            "code": "003275",
+            "hit": true,
+            "answer": "003275"
+          },
+          "0.9": {
+            "code": "003290",
+            "hit": true,
+            "answer": "003290"
+          }
+        }
+      }
+    },
+    {
+      "context_len": 131072,
+      "prompt_tokens_measured": 127765,
+      "prefill_ms": 352892.365,
+      "prefill_ms_runs": [
+        385583.778,
+        320200.951
+      ],
+      "prefill_n_runs": 2,
+      "prefill_tokens_per_sec": 365.18,
+      "decode_ms": 5612.592,
+      "decode_ms_runs": [
+        6492.309,
+        4732.875
+      ],
+      "decode_n_runs": 2,
+      "decode_tokens": 128,
+      "decode_tokens_per_sec": 21.48,
+      "buffers": {
+        "model_gpu_mib": 19625.41,
+        "model_cpu_mib": 994.63,
+        "kv_mib": 8192.0,
+        "recurrent_state_mib": 149.62,
+        "compute_gpu_mib": 250.02,
+        "compute_host_mib": 148.02,
+        "total_gpu_mib": 28217.05,
+        "kv_context_scaling_mib": 8192.0,
+        "kv_cache_shifting": false
+      },
+      "ollama_ps": {
+        "size_bytes": 29587721420,
+        "size_vram_bytes": 29587721420,
+        "size_vram_mib": 28217.0
+      },
+      "vram_peak_mb": 30490.0,
+      "vram_baseline_mb": 2868.0,
+      "quality": {
+        "multi_needle": {
+          "facts": 5,
+          "hits": 5,
+          "hit_rate": 1.0,
+          "per_fact": {
+            "Serverraum Dresden": true,
+            "Notstromaggregat Leipzig": true,
+            "Kuehlkreislauf Muenchen": true,
+            "Ersatzteillager Hamburg": true,
+            "Rechenzentrum Berlin": true
+          },
+          "answer": "Rechenzentrum Berlin=0128003\nErsatzteillager Hamburg=0128010\nKuehlkreislauf Muenchen=0128017\nNotstromaggregat Leipzig=0128024\nServerraum Dresden=0128031"
+        },
+        "verbatim": {
+          "exact": true,
+          "similarity": 1.0,
+          "checksum_correct": true,
+          "factor_correct": true,
+          "clamp_correct": true,
+          "answer_len": 243,
+          "answer": "def rescale_tile(tile, factor=0.375, clamp=(-2048, 2048)):\n    lo, hi = clamp\n    scaled = [min(max(int(v * factor), lo), hi) for v in tile]\n    checksum = sum(scaled) % 65521\n    return {\"tile\": scaled, \"checksum\": checksum, \"factor\": factor}"
+        },
+        "greedy_samples": [
+          {
+            "task_index": 0,
+            "task": "Fasse den obigen Text in genau drei Saetzen zusammen.",
+            "output": "Die Verwaltung des Gebäudes plant die Wartung der Lüftungsanlage. Mitarbeiterinnen und Mitarbeiter werden gebeten, die Hinweise am schwarzen Brett zu beachten. Der Empfang bleibt während der Umbauphase durchgehend besetzt.",
+            "eval_count": 47
+          },
+          {
+            "task_index": 1,
+            "task": "Schreibe eine Python-Funktion, die aus dem obigen Text alle genannten Nummern ex",
+            "output": "```python\nimport re\n\ndef extract_numbers(text: str) -> list:\n    numbers = re.findall(r'\\d+', text)\n    return sorted([int(n) for n in numbers])\n```",
+            "eval_count": 44
+          }
+        ]
+      },
+      "needle": {
+        "trials": 5,
+        "successes": 5,
+        "success_rate": 1.0,
+        "per_depth": {
+          "0.1": {
+            "code": "012810",
+            "hit": true,
+            "answer": "012810"
+          },
+          "0.25": {
+            "code": "012825",
+            "hit": true,
+            "answer": "012825"
+          },
+          "0.5": {
+            "code": "012850",
+            "hit": true,
+            "answer": "012850"
+          },
+          "0.75": {
+            "code": "012875",
+            "hit": true,
+            "answer": "012875"
+          },
+          "0.9": {
+            "code": "012890",
+            "hit": true,
+            "answer": "012890"
+          }
+        }
+      }
+    }
+  ]
+}
