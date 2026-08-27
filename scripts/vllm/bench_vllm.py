@@ -67,18 +67,31 @@ def vram_used_mib() -> float:
 
 def complete(host: str, model: str, prompt: str, max_tokens: int,
              seed: int = 42, timeout: float = 3600.0) -> dict:
-    """Ein Streaming-Durchlauf. Trennt Prefill (TTFT) von Decode."""
+    """Ein Streaming-Durchlauf. Trennt Prefill (TTFT) von Decode.
+
+    Nutzt bewusst ``/v1/chat/completions`` und nicht ``/v1/completions``: nur der
+    Chat-Endpunkt wendet das Chat-Template an und laesst den ``--reasoning-parser``
+    greifen. Ueber den rohen Completion-Endpunkt landet das Reasoning als
+    ``<think>...`` mitten im Antworttext und frisst das Token-Budget, bevor die
+    eigentliche Antwort kommt -- gemessen: Needle 0/5 bei intaktem Modell.
+
+    ``enable_thinking: false`` schaltet das Reasoning ganz ab, analog zu
+    ``think: false`` auf dem Ollama-Pfad. Fuer den Durchsatz ist das unerheblich
+    (tok/s normiert sich ueber die Tokenzahl), fuer die Retrieval-Sonden
+    entscheidend.
+    """
     payload = {
         "model": model,
-        "prompt": prompt,
+        "messages": [{"role": "user", "content": prompt}],
         "max_tokens": max_tokens,
         "temperature": 0.0,
         "seed": seed,
         "stream": True,
         "stream_options": {"include_usage": True},
+        "chat_template_kwargs": {"enable_thinking": False},
     }
     req = urllib.request.Request(
-        f"{host.rstrip('/')}/v1/completions",
+        f"{host.rstrip('/')}/v1/chat/completions",
         data=json.dumps(payload).encode(),
         headers={"Content-Type": "application/json"}, method="POST")
 
@@ -102,7 +115,8 @@ def complete(host: str, model: str, prompt: str, max_tokens: int,
             if chunk.get("usage"):
                 usage = chunk["usage"]
             for ch in chunk.get("choices") or []:
-                piece = ch.get("text") or ""
+                delta = ch.get("delta") or {}
+                piece = delta.get("content") or ""
                 if piece:
                     if ttft is None:
                         ttft = time.perf_counter() - t0
@@ -118,8 +132,14 @@ def complete(host: str, model: str, prompt: str, max_tokens: int,
     }
 
 
-def build_body(target_tokens: int, chars_per_token: float, prefix: str = "") -> str:
-    reserve = 420
+def build_body(target_tokens: int, chars_per_token: float, prefix: str = "",
+               reserve: int = 1024) -> str:
+    """``reserve`` haelt Platz frei fuer Frage UND Antwort.
+
+    vLLM lehnt Anfragen mit HTTP 400 ab, wenn Prompt plus ``max_tokens`` die
+    ``max_model_len`` uebersteigen -- anders als Ollama, das still abschneidet.
+    Bei 131072 sind so alle Zellen gescheitert.
+    """
     body_chars = int(max(target_tokens - reserve, 1) * chars_per_token)
     reps = max(int(body_chars / len(FILLER)) + 1, 1)
     body = (FILLER * reps)[:body_chars]
@@ -129,8 +149,8 @@ def build_body(target_tokens: int, chars_per_token: float, prefix: str = "") -> 
 
 
 def build_haystack(target_tokens: int, cpt: float, depth: float, code: str,
-                   prefix: str = "") -> str:
-    body = build_body(target_tokens, cpt, prefix)
+                   prefix: str = "", reserve: int = 1024) -> str:
+    body = build_body(target_tokens, cpt, prefix, reserve)
     needle = NEEDLE_TEMPLATE.format(code=code)
     cut = int(len(body) * depth)
     space = body.find(" ", cut)

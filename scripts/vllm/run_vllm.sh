@@ -82,30 +82,41 @@ for entry in "${CHECKPOINTS[@]}"; do
   say ""
   say "=== $dir ($label) ==="
 
-  docker compose -f "$HERE/compose.vllm.yml" down >/dev/null 2>&1
-  VLLM_CKPT="$dir" VLLM_SERVED="$served" VLLM_MAX_LEN=131072 \
-    docker compose -f "$HERE/compose.vllm.yml" up -d >/dev/null 2>&1
-
-  # 18-22 GiB laden plus Kompilierung -- das dauert Minuten. Auf Absturz
-  # pruefen: OOM im Graph-Capture ist der erwartbare Fehler auf einer 5090.
-  say "Warte auf Bereitschaft ..."
+  # CUDA-Graphs zuerst versuchen. Die vLLM-Recipe verlangt --enforce-eager auf
+  # einer einzelnen 5090, aber das gilt fuer NVFP4 mit 21,81 GiB. Bei INT4
+  # (17,95 GiB) passen die Graphs -- und ohne sie kostet jede Decode-Iteration
+  # den vollen Kernel-Launch-Overhead: gemessen 45 statt 133 tok/s.
   ready=0
-  for i in $(seq 1 90); do
-    if curl -sf "$HOST/v1/models" >/dev/null 2>&1; then ready=1; break; fi
-    if ! docker ps --format '{{.Names}}' | grep -qx vllm-bench; then
-      say "  Container gestorben. Letzte Logzeilen:"
-      docker logs --tail 30 vllm-bench 2>&1 | sed 's/^/    /'
-      break
+  mode=""
+  for attempt in graphs eager; do
+    if [[ "$attempt" == "graphs" ]]; then
+      files=(-f "$HERE/compose.vllm.yml" -f "$HERE/compose.vllm.graphs.yml")
+    else
+      files=(-f "$HERE/compose.vllm.yml")
     fi
-    sleep 10
+
+    docker compose -f "$HERE/compose.vllm.yml" down >/dev/null 2>&1
+    VLLM_CKPT="$dir" VLLM_SERVED="$served" VLLM_MAX_LEN=131072       docker compose "${files[@]}" up -d >/dev/null 2>&1
+
+    say "  Start mit $attempt ..."
+    for i in $(seq 1 120); do
+      if curl -sf "$HOST/v1/models" >/dev/null 2>&1; then ready=1; mode="$attempt"; break; fi
+      if ! docker ps --format '{{.Names}}' | grep -qx vllm-bench; then
+        say "  Container gestorben ($attempt):"
+        docker logs --tail 15 vllm-bench 2>&1 | grep -iE "error|oom|memory" | tail -5 | sed 's/^/    /'
+        break
+      fi
+      sleep 10
+    done
+    [[ $ready -eq 1 ]] && break
+    say "  $attempt gescheitert, naechster Versuch."
   done
 
   if [[ $ready -eq 0 ]]; then
-    say "  UEBERSPRUNGEN: $label wurde nicht bereit."
-    docker logs --tail 20 vllm-bench 2>&1 | sed 's/^/    /' || true
+    say "  UEBERSPRUNGEN: $label wurde in keiner Variante bereit."
     continue
   fi
-  say "  bereit."
+  say "  bereit ($mode)."
 
   # Die tatsaechliche KV-Kapazitaet steht im Log und entscheidet, welcher
   # Kontext ueberhaupt moeglich ist.
@@ -114,7 +125,7 @@ for entry in "${CHECKPOINTS[@]}"; do
     | tail -6 | sed 's/^/    /'
 
   timeout 10800 python "$HERE/bench_vllm.py" \
-    --host "$HOST" --model "$served" --label "$label" \
+    --host "$HOST" --model "$served" --label "${label}-${mode}" \
     --contexts "${CONTEXTS[@]}" \
     --measure-runs 5 --warmup-runs 1 --decode-tokens 512 \
     --output-dir "$OUT" \
