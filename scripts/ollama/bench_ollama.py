@@ -212,6 +212,39 @@ def parse_llamacpp_buffers(container: str, since: str) -> dict:
     return buffers
 
 
+KIB_PER_TOKEN = {"f16": 64.0, "q8_0": 34.0, "q4_0": 18.0}
+
+
+def verify_kv_type(buffers: dict, declared: str, context_len: int) -> dict:
+    """Prueft, ob der tatsaechlich gefahrene KV-Typ der Beschriftung entspricht.
+
+    ``--kv-cache-type`` ist nur ein Etikett; wirksam ist OLLAMA_KV_CACHE_TYPE im
+    Container. Laeuft versehentlich ein zweiter Messlauf gegen dieselbe Instanz,
+    kann er den Container umkonfigurieren und die Beschriftung wird still
+    falsch. Am 2026-08-27 sind so fuenf Zellen entstanden, die q4_0 auswiesen,
+    aber mit q8_0 liefen. Die von llama.cpp gemeldete Puffergroesse ist
+    Bodenwahrheit, also wird hier dagegen geprueft.
+    """
+    kv_mib = buffers.get("kv_mib")
+    if not kv_mib or not context_len:
+        return {"kv_type_verified": None}
+
+    measured = None
+    for name, kib in KIB_PER_TOKEN.items():
+        expected = kib * context_len / 1024.0
+        if abs(kv_mib - expected) / expected <= 0.02:
+            measured = name
+            break
+
+    if measured == declared:
+        return {"kv_type_verified": True, "kv_type_measured": measured}
+
+    print(f"    WARNUNG: KV-Typ stimmt nicht! beschriftet '{declared}', "
+          f"gemessen '{measured}' ({kv_mib} MiB bei ctx={context_len}). "
+          f"Laeuft ein zweiter Messlauf gegen dieselbe Instanz?", file=sys.stderr)
+    return {"kv_type_verified": False, "kv_type_measured": measured}
+
+
 def ollama_ps(host: str) -> dict:
     """Ollamas eigene Buchfuehrung ueber das geladene Modell."""
     try:
@@ -369,6 +402,7 @@ def measure_context(
     measure_runs: int,
     seed: int,
     container: str,
+    kv_cache_type: str,
 ) -> dict:
     """Misst Durchsatz, VRAM und Retrieval fuer eine Kontextlaenge."""
 
@@ -391,6 +425,7 @@ def measure_context(
     # den letzten Ladevorgang, nicht die Zeitgrenze.
     since = f"{int(time.time() - load_start) + 120}s"
     buffers = parse_llamacpp_buffers(container, since)
+    buffers.update(verify_kv_type(buffers, kv_cache_type, context_len))
     ps = ollama_ps(host)
 
     prefill_ms: List[float] = []
@@ -658,7 +693,7 @@ def main() -> int:
             m = measure_context(
                 args.host, args.model, ctx, cpt, args.needle_depths,
                 args.decode_tokens, args.warmup_runs, args.measure_runs, args.seed,
-                args.container,
+                args.container, args.kv_cache_type,
             )
             measurements.append(m)
             b = m.get("buffers", {})

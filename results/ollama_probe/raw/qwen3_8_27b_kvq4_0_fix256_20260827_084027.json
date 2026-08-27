@@ -1,0 +1,166 @@
+{
+  "schema_version": "2.0",
+  "experiment_id": "qwen3_8_27b_kvq4_0_fix256_20260827_084027",
+  "timestamp": "2026-08-27T10:03:11",
+  "model": "qwen3.8:27b",
+  "model_config": {
+    "family": "qwen35",
+    "parameter_size": "27.3B",
+    "quantization_level": "Q4_K_M",
+    "architecture": "qwen35",
+    "num_layers": 65,
+    "num_q_heads": 24,
+    "num_kv_heads": 4,
+    "head_dim_k": 256,
+    "head_dim_v": 256,
+    "max_position_embeddings": 262144,
+    "full_attention_interval": 4,
+    "gqa_ratio": "6:1",
+    "kv_bearing_layers": 16
+  },
+  "runtime": {
+    "engine": "ollama/llama.cpp",
+    "host": "http://127.0.0.1:11435",
+    "weight_quant": "Q4_K_M",
+    "note": "Gewichte GGUF-quantisiert, nicht FP16 wie in der Arbeit; KV-Quantisierung durch llama.cpp, nicht quanto/HQQ."
+  },
+  "kv_quant": {
+    "enabled": true,
+    "kv_cache_type": "q4_0",
+    "backend": "llama.cpp",
+    "analytic_bytes_per_token": 18432.0
+  },
+  "hardware": {
+    "gpu_name": "NVIDIA GeForce RTX 5090",
+    "vram_total_mb": 32607.0,
+    "driver_version": "591.74"
+  },
+  "config": {
+    "seed": 42,
+    "warmup_runs": 1,
+    "measure_runs": 3,
+    "decode_tokens": 128,
+    "needle_depths": [
+      0.1,
+      0.25,
+      0.5,
+      0.75,
+      0.9
+    ],
+    "chars_per_token": 4.4975
+  },
+  "measurements": [
+    {
+      "context_len": 262144,
+      "prompt_tokens_measured": 260809,
+      "prefill_ms": 263278.773,
+      "prefill_ms_runs": [
+        263278.773,
+        263311.901,
+        263243.7
+      ],
+      "prefill_n_runs": 3,
+      "prefill_tokens_per_sec": 990.62,
+      "decode_ms": 2211.097,
+      "decode_ms_runs": [
+        2302.543,
+        2211.097,
+        1787.691
+      ],
+      "decode_n_runs": 3,
+      "decode_tokens": 128,
+      "decode_tokens_per_sec": 55.18,
+      "buffers": {
+        "model_gpu_mib": 15339.44,
+        "model_cpu_mib": 682.03,
+        "kv_mib": 4608.0,
+        "kv_mib_sum": 5632.0,
+        "kv_mib_n": 2,
+        "recurrent_state_mib": 748.12,
+        "compute_gpu_mib": 1360.28,
+        "compute_gpu_mib_sum": 2008.32,
+        "compute_gpu_mib_n": 3,
+        "compute_host_mib": 276.28,
+        "compute_host_mib_sum": 828.32,
+        "compute_host_mib_n": 3,
+        "clip_mib": 887.99,
+        "total_gpu_mib": 24615.87,
+        "kv_context_scaling_mib": 4608.0,
+        "kv_cache_shifting": false
+      },
+      "ollama_ps": {},
+      "vram_peak_mb": 27514.0,
+      "vram_baseline_mb": 2692.0,
+      "quality": {
+        "multi_needle": {
+          "facts": 5,
+          "hits": 5,
+          "hit_rate": 1.0,
+          "per_fact": {
+            "Serverraum Dresden": true,
+            "Notstromaggregat Leipzig": true,
+            "Kuehlkreislauf Muenchen": true,
+            "Ersatzteillager Hamburg": true,
+            "Rechenzentrum Berlin": true
+          },
+          "answer": "Rechenzentrum Berlin=0256003\nErsatzteillager Hamburg=0256010\nKuehlkreislauf Muenchen=0256017\nNotstromaggregat Leipzig=0256024\nServerraum Dresden=0256031"
+        },
+        "verbatim": {
+          "exact": true,
+          "similarity": 1.0,
+          "checksum_correct": true,
+          "factor_correct": true,
+          "clamp_correct": true,
+          "answer_len": 243,
+          "answer": "def rescale_tile(tile, factor=0.375, clamp=(-2048, 2048)):\n    lo, hi = clamp\n    scaled = [min(max(int(v * factor), lo), hi) for v in tile]\n    checksum = sum(scaled) % 65521\n    return {\"tile\": scaled, \"checksum\": checksum, \"factor\": factor}"
+        },
+        "greedy_samples": [
+          {
+            "task_index": 0,
+            "task": "Fasse den obigen Text in genau drei Saetzen zusammen.",
+            "output": "Die Verwaltung des Gebäudes plant die Wartung der Lüftungsanlage. Mitarbeiterinnen und Mitarbeiter werden gebeten, die Hinweise am schwarzen Brett zu beachten. Der Empfang bleibt während der Umbauphase durchgehend besetzt.",
+            "eval_count": 47
+          },
+          {
+            "task_index": 1,
+            "task": "Schreibe eine Python-Funktion, die aus dem obigen Text alle genannten Nummern ex",
+            "output": "```python\nimport re\n\ndef extract_numbers(text: str) -> list:\n    \"\"\"\n    Extrahiert alle genannten Nummern aus dem Text und gibt sie als sortierte Liste zurueck.\n    \"\"\"\n    # Findet alle Zahlen (ganze Zahlen, Dezimalzahlen)\n    matches = re.findall(r'\\d+(?:\\.\\d+)?', text)\n    \n    # Konvertiert zu Zahlen (int oder float) und sortiert\n    numbers = []\n    for match in matches:\n        if '.' in match:\n            numbers.append(float(match))\n        else:\n            numbers.append(int(match))\n    \n    return sorted(numbers)\n```",
+            "eval_count": 144
+          }
+        ]
+      },
+      "needle": {
+        "trials": 5,
+        "successes": 5,
+        "success_rate": 1.0,
+        "per_depth": {
+          "0.1": {
+            "code": "025610",
+            "hit": true,
+            "answer": "025610"
+          },
+          "0.25": {
+            "code": "025625",
+            "hit": true,
+            "answer": "025625"
+          },
+          "0.5": {
+            "code": "025650",
+            "hit": true,
+            "answer": "025650"
+          },
+          "0.75": {
+            "code": "025675",
+            "hit": true,
+            "answer": "025675"
+          },
+          "0.9": {
+            "code": "025690",
+            "hit": true,
+            "answer": "025690"
+          }
+        }
+      }
+    }
+  ]
+}
