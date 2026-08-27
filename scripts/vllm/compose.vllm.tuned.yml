@@ -1,0 +1,33 @@
+# Override: KV-Pool auf den tatsaechlichen Bedarf begrenzen.
+#
+# Mit --gpu-memory-utilization 0.92 nimmt vLLM rund 30 GB und laesst nach dem
+# Desktop keine 600 MB uebrig -- der Embedder mit 4,2 GB passt dann nicht mehr
+# daneben. Das ist aber eine Wahl, keine Notwendigkeit: der Pool war auf
+# 214 849 Token dimensioniert, gebraucht werden 131 072.
+#
+# --kv-cache-memory setzt den Pool direkt in Bytes und uebersteuert die
+# utilization-basierte Schaetzung. vLLM schlaegt den Wert im Startlog selbst vor.
+#
+#   5,5 GiB = 5.905.580.032 Byte  ->  rund 142.000 Token bei 40,5 KiB/Token
+#
+# Rechnung fuer die Gesamtbelegung:
+#   Gewichte 17,95 + Aktivierung 3,05 + Graphs 0,11 + KV 5,50 = 26,6 GiB
+#   Bei 32,6 GB Karte und ~2 GB Desktop bleiben rund 4 GB frei.
+#
+#   docker compose -f compose.vllm.yml -f compose.vllm.graphs.yml \
+#                  -f compose.vllm.tuned.yml up -d
+
+services:
+  vllm-bench:
+    command:
+      - --model=/models/${VLLM_CKPT:-Qwen3.8-27B-INT4}
+      - --served-model-name=${VLLM_SERVED:-qwen3.8-bench}
+      - --max-model-len=${VLLM_MAX_LEN:-131072}
+      - --kv-cache-memory=${VLLM_KV_BYTES:-5905580032}
+      - --kv-cache-dtype=fp8
+      - --max-num-seqs=8
+      - --language-model-only
+      - --reasoning-parser=qwen3
+      - --enable-auto-tool-choice
+      - --tool-call-parser=qwen3_coder
+      - --speculative-config={"method":"mtp","num_speculative_tokens":3}
