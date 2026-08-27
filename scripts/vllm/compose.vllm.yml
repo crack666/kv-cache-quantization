@@ -1,0 +1,67 @@
+# vLLM mit NVFP4 auf einer einzelnen RTX 5090 — nur zur Durchsatzmessung.
+#
+# Zweck: Auf Blackwell liegen die FP4-Tensorkerne brach, solange llama.cpp die
+# GGUF-Integer-Quants zu FP16 dequantisiert. Gemessen wird ausschliesslich, ob
+# das genug Durchsatz bringt, um ein zweites Profil zu rechtfertigen.
+#
+# Port 11436 — 11434 ist die Produktion, 11435 die Ollama-Bench-Instanz.
+# NIE gleichzeitig mit einer davon betreiben: 32 GB reichen nur fuer ein
+# residentes 27B-Modell.
+#
+#   OLLAMA_MODELS_PATH= docker compose -f compose.vllm.yml up -d
+#   docker compose -f compose.vllm.yml logs -f      # Start dauert Minuten
+#   docker compose -f compose.vllm.yml down
+#
+# Die Flags folgen der offiziellen vLLM-Recipe fuer Qwen3.8-27B:
+#
+#   --enforce-eager        Pflicht auf einer einzelnen 5090. Ohne sie stirbt der
+#                          Start im CUDA-Graph-Capture mit OOM (nutzbar sind nur
+#                          31,4 GB). Kostet Durchsatz — ausgerechnet das, wofuer
+#                          man NVFP4 nimmt. Gehoert in die Bewertung.
+#   --language-model-only  Vision weg. Hebt die KV-Kapazitaet laut Recipe von
+#                          91k auf 136k Token; fuer Coding entbehrlich.
+#   --max-num-seqs 8       Der Gated-DeltaNet-State wird PRO Sequenz-Slot
+#                          allokiert, Default ist 256. Deckeln bringt laut
+#                          Recipe nochmal ~17k Token.
+#   --kv-cache-dtype fp8   Niedrigste Stufe, die vLLM kann (~32 KiB/Token).
+#                          llama.cpp kommt mit q4_0 auf 18 KiB/Token.
+#   --speculative-config   MTP-Draft, das Gegenstueck zu Ollamas
+#                          draft_num_predict. Laut Recipe Akzeptanz 0,75–0,90.
+
+name: kvq-vllm
+
+services:
+  vllm-bench:
+    image: vllm/vllm-openai:nightly
+    container_name: vllm-bench
+    ports:
+      - "127.0.0.1:11436:8000"
+    volumes:
+      - ${VLLM_MODELS_PATH:-\\wsl.localhost\Ubuntu\home\crack\ai-models\vllm-models}:/models:ro
+      # HF-Cache mitgeben, damit der Tokenizer nicht neu gezogen wird.
+      - ${HF_CACHE_PATH:-\\wsl.localhost\Ubuntu\home\crack\.cache\huggingface}:/root/.cache/huggingface
+    environment:
+      - NCCL_P2P_DISABLE=1        # laut Recipe fuer Blackwell noetig
+      - VLLM_USE_V1=1
+    command:
+      - --model=/models/Qwen3.8-27B-NVFP4
+      - --served-model-name=qwen3.8-nvfp4
+      - --max-model-len=${VLLM_MAX_LEN:-131072}
+      - --gpu-memory-utilization=${VLLM_GPU_UTIL:-0.92}
+      - --kv-cache-dtype=fp8
+      - --max-num-seqs=8
+      - --enforce-eager
+      - --language-model-only
+      - --reasoning-parser=qwen3
+      - --enable-auto-tool-choice
+      - --tool-call-parser=qwen3_coder
+      - --speculative-config={"method":"mtp","num_speculative_tokens":3}
+    shm_size: "8gb"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: "no"
