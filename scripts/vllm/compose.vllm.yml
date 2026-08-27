@@ -44,8 +44,8 @@ services:
       - NCCL_P2P_DISABLE=1        # laut Recipe fuer Blackwell noetig
       - VLLM_USE_V1=1
     command:
-      - --model=/models/Qwen3.8-27B-NVFP4
-      - --served-model-name=qwen3.8-nvfp4
+      - --model=/models/${VLLM_CKPT:-Qwen3.8-27B-NVFP4}
+      - --served-model-name=${VLLM_SERVED:-qwen3.8-bench}
       - --max-model-len=${VLLM_MAX_LEN:-131072}
       - --gpu-memory-utilization=${VLLM_GPU_UTIL:-0.92}
       - --kv-cache-dtype=fp8

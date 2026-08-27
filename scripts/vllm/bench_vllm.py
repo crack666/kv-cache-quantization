@@ -226,6 +226,8 @@ def main() -> int:
     p.add_argument("--measure-runs", type=int, default=5)
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--output-dir", default="../../results/ollama_probe/raw_vllm")
+    p.add_argument("--label", default="nvfp4",
+                   help="Kennung des Checkpoints fuer Dateiname und Ergebnis")
     args = p.parse_args()
 
     if ":11434" in args.host or ":11435" in args.host:
@@ -239,7 +241,7 @@ def main() -> int:
         return 2
 
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    experiment_id = f"vllm_nvfp4_{ts}"
+    experiment_id = f"vllm_{args.label}_{ts}"
 
     print("=" * 72)
     print(f"vLLM NVFP4 | Host {args.host} | Kontexte {args.contexts}")
@@ -275,7 +277,7 @@ def main() -> int:
         "runtime": {
             "engine": "vllm",
             "host": args.host,
-            "quantization": "NVFP4 (unsloth, mixed precision)",
+            "checkpoint": args.label,
             "note": "VRAM aus nvidia-smi, nicht aus Puffermeldungen -- vLLM "
                     "allokiert ueber gpu-memory-utilization vorab und schluesselt "
                     "nicht auf. Nicht mit den llama.cpp-Puffersummen vergleichbar.",
