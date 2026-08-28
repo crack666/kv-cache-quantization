@@ -29,10 +29,16 @@ gegen 79,5 unter Ollama — plus 48 %**, bei identischer Qualität und rund
 Bei 27 151 MiB Spitzenbelegung bleiben rund 5,4 GB frei — der Embedder mit
 4,2 GB passt daneben, Jarvis zusätzlich nicht.
 
-**Bleibt es bei Ollama, dann `q4_0` bei 131 072.** Das kostet 4 % Durchsatz und
-bringt 2 GB Reserve, also genau den Betrag, um den euer Desktop schwankt. Wer
-den langen Kontext braucht, kann bis 262 144 gehen: das kostet bei kurzer
-Session nur 4,5 %, lässt aber nur 1 GB frei.
+**Bleibt es bei Ollama, hängt der KV-Typ an der Kontextlänge:**
+
+- **Bei 131 072 bleibt `q8_0`.** Es ist 3,8 % schneller als `q4_0` und passt
+  mit dem Embedder bequem (28 103 MiB belegt, 4 085 MiB frei, kein Spilling).
+  Die 2 GB, die `q4_0` spart, werden dort schlicht nicht gebraucht.
+- **Ab etwa 160 000 wird `q4_0` nötig.** Mit `q8_0` und Embedder läuft die
+  Karte dann voll: bei 196 608 wären es rund 32,2 GB. `q4_0` bleibt bei 30 GB.
+- **Bei 262 144 ist `q4_0` alternativlos** — `q8_0` kostet dort 8 704 MiB allein
+  für den Cache und bricht messbar ein (62,5 statt 131,9 tok/s bei kurzer
+  Session, weil die Karte volläuft).
 
 **`f16`-KV hat in keinem Fall einen Grund.** Es kostet bei 131 072 fast 4 GB
 mehr als `q8_0` und ist mit 61,7 gegen 79,5 tok/s deutlich langsamer, ohne je
