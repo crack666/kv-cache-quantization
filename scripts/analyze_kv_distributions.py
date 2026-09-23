@@ -196,10 +196,28 @@ def compute_tensor_stats(tensor: torch.Tensor, histogram_bins: int = 0) -> dict:
     return result
 
 
-def analyze_layer(layer_idx: int, kv: dict, histogram_bins: int = 0) -> dict:
+PER_HEAD_FIELDS = ("kurtosis", "min", "max", "outlier_ratio_3sigma",
+                   "outlier_ratio_6sigma", "dynamic_range", "variance_ratio")
+
+
+def per_head_stats(tensor: torch.Tensor) -> list:
+    """Dieselben Kennzahlen je KV-Head. Quantisierungsgruppen (64 Werte) liegen
+    stets innerhalb eines Heads; die Layer-Kennzahl mittelt ueber sie hinweg."""
+    out = []
+    for h in range(tensor.shape[1]):
+        s = compute_tensor_stats(tensor[:, h:h + 1])
+        out.append({"head": h, **{k: s[k] for k in PER_HEAD_FIELDS}})
+    return out
+
+
+def analyze_layer(layer_idx: int, kv: dict, histogram_bins: int = 0,
+                  per_head: bool = False) -> dict:
     """Analyze K and V tensors for a single layer."""
     k_stats = compute_tensor_stats(kv["key"], histogram_bins=histogram_bins)
     v_stats = compute_tensor_stats(kv["value"], histogram_bins=histogram_bins)
+    if per_head:
+        k_stats["per_head"] = per_head_stats(kv["key"])
+        v_stats["per_head"] = per_head_stats(kv["value"])
 
     return {
         "layer": layer_idx,
@@ -225,6 +243,14 @@ def build_parser():
         "--histogram-bins", type=int, default=200,
         help="Number of histogram bins for z-scored distribution (0 = skip). Default: 200"
     )
+    p.add_argument(
+        "--split", default="test", choices=("test", "validation", "train"),
+        help="WikiText-2-Split. Der Seed aendert die Stichprobe nicht (es werden die "
+             "ersten --max-tokens Tokens genommen); eine zweite Stichprobe braucht "
+             "einen anderen Split. Default: test"
+    )
+    p.add_argument("--per-head", action="store_true",
+                   help="Kennzahlen zusaetzlich je KV-Head ablegen")
     return p
 
 
@@ -266,7 +292,7 @@ def main():
 
     # Load WikiText-2 input
     print("\nPreparing input from WikiText-2...")
-    ds = load_dataset("wikitext", "wikitext-2-raw-v1", split="test")
+    ds = load_dataset("wikitext", "wikitext-2-raw-v1", split=args.split)
     text = "\n\n".join([t for t in ds["text"] if t.strip()])
     tokens = tokenizer(text, return_tensors="pt", truncation=True, max_length=args.max_tokens)
     input_ids = tokens["input_ids"].to(args.device)
@@ -284,7 +310,8 @@ def main():
         print(f"  Histogram bins: {args.histogram_bins} (z-scored, range [-6, 6])")
     layer_stats = []
     for layer_idx in sorted(kv_data.keys()):
-        stats = analyze_layer(layer_idx, kv_data[layer_idx], histogram_bins=args.histogram_bins)
+        stats = analyze_layer(layer_idx, kv_data[layer_idx], histogram_bins=args.histogram_bins,
+                              per_head=args.per_head)
         layer_stats.append(stats)
 
         # Print compact summary
@@ -342,6 +369,8 @@ def main():
             "max_tokens": actual_len,
             "seed": args.seed,
             "dataset": "wikitext-2-raw-v1",
+            "split": args.split,
+            "per_head": args.per_head,
             "histogram_bins": args.histogram_bins,
         },
         "summary": summary,
