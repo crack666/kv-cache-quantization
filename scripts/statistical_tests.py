@@ -189,6 +189,17 @@ def rotation_layer_kurtosis(model):
     return per_layer, data["kurtosis_before_mean"]
 
 
+def rotation_before_after(model):
+    """Key-Kurtosis je Layer vor und nach der Hadamard-Rotation (2048 Tokens)."""
+    data = json.loads((ROT_DIR / ROTATION_RUNS[model]).read_text(encoding="utf-8"))
+    before, after = [], []
+    for entry in data["kurtosis_per_layer"]:
+        before.append(entry.get("kurt_before", entry.get("before")))
+        after.append(entry.get("kurt_after", entry.get("after")))
+    if None in before or None in after:
+        raise KeyError(f"Kurtosis-Feld fehlt in {ROTATION_RUNS[model]}")
+    return before, after, data["kurtosis_after_mean"]
+
 def gemma_layer_groups():
     """Key-Kurtosis der Gemma-Layer, getrennt nach Attention-Typ."""
     path = next(DIST_DIR.glob("kv_dist_gemma*.json"))
@@ -298,6 +309,26 @@ def main():
     print()
     print("  Die absoluten Werte haengen leicht von der Stichprobe ab, die")
     print("  Rangfolge der Layer dagegen kaum. Das traegt die Layer-Auswahl.")
+
+    print()
+    print("=" * 78)
+    print("Rotationsexperiment: Kurtosis je Layer vor gegen nach der Rotation")
+    print("=" * 78)
+    print(f"{'Modell':<12}{'Layer':>6}{'rho':>7}{'p':>10}{'nachher < 0':>13}"
+          f"{'min':>8}{'max':>8}{'Mittel':>8}")
+    for model in ("Qwen3-8B", "Qwen2-7B"):
+        before, after, after_mean = rotation_before_after(model)
+        res = stats.spearmanr(before, after)
+        neg = sum(v < 0 for v in after)
+        print(f"{model:<12}{len(after):>6}{res.statistic:>7.2f}{res.pvalue:>10.1e}"
+              f"{f'{neg}/{len(after)}':>13}{min(after):>8.2f}{max(after):>8.2f}"
+              f"{after_mean:>8.2f}")
+    print()
+    print("  Negatives rho: Der Layer mit der hoechsten Kurtosis vor der Rotation")
+    print("  hat danach die niedrigste. Bei Qwen3-8B schreibt die Rotation den")
+    print("  Ausreisserkanal als +-c/sqrt(d_h) in jede Dimension, die Werte sammeln")
+    print("  sich um zwei Betraege (Grenzwert -2). Qwen2-7B zeigt das Muster nicht.")
+    print("  Die Layer eines Modells sind nicht unabhaengig; p als Groessenordnung.")
 
     import scipy
     print()
