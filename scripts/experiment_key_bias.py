@@ -29,9 +29,22 @@ sys.path.insert(0, str(BASE / "scripts"))
 
 from benchmarks.perplexity import compute_perplexity          # noqa: E402
 from core.model_loader import load_model                       # noqa: E402
-from experiment_layerwise import make_cache_factory            # noqa: E402
 
 OUT = BASE / "results/raw/key_bias"
+
+
+def make_cache_factory(config, nbits, axis_key, axis_value, group_size, residual):
+    """Alle Layer quantisiert; getrennte Achsen erlauben die KIVI-Konfiguration."""
+    from transformers.cache_utils import Cache, HQQQuantizedLayer
+
+    n_layers = config.get_text_config(decoder=True).num_hidden_layers
+
+    def factory():
+        return Cache(layers=[HQQQuantizedLayer(nbits, axis_key, axis_value,
+                                               group_size, residual)
+                             for _ in range(n_layers)])
+
+    return factory
 
 
 def main():
@@ -41,11 +54,16 @@ def main():
     ap.add_argument("--threshold", type=float, default=50.0,
                     help="Bias-Kanaele mit |b| ueber diesem Wert gelten als gross")
     ap.add_argument("--nbits", type=int, default=4)
-    ap.add_argument("--axis", type=int, default=1)
+    ap.add_argument("--axis-key", type=int, default=1,
+                    help="1 = per-Token (HQQ-Konfiguration), 0 = per-Channel (KIVI)")
+    ap.add_argument("--axis-value", type=int, default=1)
     ap.add_argument("--group-size", type=int, default=64)
     ap.add_argument("--residual", type=int, default=128)
     ap.add_argument("--ppl-tokens", type=int, default=4096)
+    ap.add_argument("--skip-zero-all", action="store_true",
+                    help="Bedingung 'ganzer Bias null' auslassen (zerstoert schon FP16)")
     args = ap.parse_args()
+    label = f"int{args.nbits}" + ("_kivi" if (args.axis_key, args.axis_value) == (0, 1) else "")
 
     model, tokenizer, _ = load_model(args.model, attn_backend="sdpa", device="cuda")
     model.eval()
@@ -58,8 +76,7 @@ def main():
           f"Bias-Kanaelen mit |b| > {args.threshold}: {big}")
     print(f"  max|b| = {original.float().abs().max():.1f}\n")
 
-    n = model.config.get_text_config(decoder=True).num_hidden_layers
-    quant_all = make_cache_factory(model.config, list(range(n)), args.nbits, args.axis,
+    quant_all = make_cache_factory(model.config, args.nbits, args.axis_key, args.axis_value,
                                    args.group_size, args.residual)
 
     def set_bias(variant):
@@ -73,12 +90,15 @@ def main():
 
     conditions = [
         ("fp16_original", "original", None),
-        (f"int{args.nbits}_original", "original", quant_all),
+        (f"{label}_original", "original", quant_all),
         ("fp16_zero_big", "zero_big", None),
-        (f"int{args.nbits}_zero_big", "zero_big", quant_all),
-        ("fp16_zero_all", "zero_all", None),
-        (f"int{args.nbits}_zero_all", "zero_all", quant_all),
+        (f"{label}_zero_big", "zero_big", quant_all),
     ]
+    if not args.skip_zero_all:
+        conditions += [
+            ("fp16_zero_all", "zero_all", None),
+            (f"{label}_zero_all", "zero_all", quant_all),
+        ]
     results = {}
     for name, variant, fac in conditions:
         set_bias(variant)
@@ -93,11 +113,11 @@ def main():
     ref = results["fp16_original"]
     OUT.mkdir(parents=True, exist_ok=True)
     stamp = time.strftime("%Y%m%d_%H%M%S")
-    path = OUT / f"key_bias_{args.model.split('/')[-1]}_L{args.layer}_int{args.nbits}_{stamp}.json"
+    path = OUT / f"key_bias_{args.model.split('/')[-1]}_L{args.layer}_{label}_{stamp}.json"
     json.dump({"model": args.model, "layer": args.layer, "threshold": args.threshold,
                "big_channels": big,
                "big_values": [round(original[i].item(), 2) for i in big],
-               "nbits": args.nbits, "axis": args.axis,
+               "nbits": args.nbits, "axis_key": args.axis_key, "axis_value": args.axis_value,
                "q_group_size": args.group_size, "residual_length": args.residual,
                "ppl_tokens": args.ppl_tokens,
                "results": {k: {"ppl": v, "delta": v - ref} for k, v in results.items()}},
