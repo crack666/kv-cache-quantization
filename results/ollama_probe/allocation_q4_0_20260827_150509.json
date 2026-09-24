@@ -1,0 +1,50 @@
+{
+  "chars_per_token": 4.493041749502982,
+  "rows": [
+    {
+      "fill": 8192,
+      "num_ctx": 131072,
+      "prompt_tokens": 8096,
+      "decode_tps": 131.46,
+      "vram_loaded_mib": 23970.0,
+      "vram_delta_mib": 21584.0,
+      "decode_tps_runs": [
+        126.11,
+        136.82,
+        132.59,
+        114.51,
+        131.46
+      ]
+    },
+    {
+      "fill": 8192,
+      "num_ctx": 196608,
+      "prompt_tokens": 8096,
+      "decode_tps": 130.02,
+      "vram_loaded_mib": 25810.0,
+      "vram_delta_mib": 23373.0,
+      "decode_tps_runs": [
+        124.63,
+        136.37,
+        130.02,
+        115.23,
+        132.81
+      ]
+    },
+    {
+      "fill": 8192,
+      "num_ctx": 262144,
+      "prompt_tokens": 8096,
+      "decode_tps": 131.93,
+      "vram_loaded_mib": 27567.0,
+      "vram_delta_mib": 25170.0,
+      "decode_tps_runs": [
+        126.17,
+        137.06,
+        132.08,
+        115.0,
+        131.93
+      ]
+    }
+  ]
+}

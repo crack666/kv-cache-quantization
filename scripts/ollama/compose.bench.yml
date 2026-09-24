@@ -1,0 +1,53 @@
+# Isolierte Ollama-Instanz nur fuer Messlaeufe.
+#
+# Zweck: OLLAMA_KV_CACHE_TYPE ist eine Container-Env-Variable und laesst sich
+# nicht je Anfrage setzen. Ein Durchlauf ueber f16/q8_0/q4_0 muesste den
+# Container also dreimal neu starten. Auf der Produktionsinstanz (ai-stack,
+# Port 11434) waere das ein Eingriff in einen laufenden Dienst -- OpenClaw,
+# Cline, n8n und LiteLLM haengen daran.
+#
+# Diese Instanz laeuft deshalb auf Port 11435 mit eigenem Env-Satz. Das
+# Modellverzeichnis wird geteilt, damit die 17-40 GB grossen Blobs nicht
+# doppelt auf der Platte liegen und gezogene Quant-Tags fuer beide Instanzen
+# verfuegbar sind.
+#
+# WICHTIG: Nicht gleichzeitig mit der Produktionsinstanz betreiben. Beide
+# wuerden sich die 32 GB VRAM teilen und die Messung waere wertlos; ausserdem
+# schreiben dann zwei Ollama-Prozesse in dasselbe Modellverzeichnis.
+#
+#   docker compose -f compose.bench.yml down          # vorher: ai-stack ollama stoppen
+#   OLLAMA_KV_CACHE_TYPE=q4_0 docker compose -f compose.bench.yml up -d
+#
+# Aufraeumen nach der Messreihe:
+#   docker compose -f compose.bench.yml down
+
+name: kvq-bench
+
+services:
+  ollama-bench:
+    # Version A/B-testbar: OLLAMA_IMAGE=ollama/ollama:0.33.0 docker compose ... up -d
+    image: ${OLLAMA_IMAGE:-ollama/ollama:latest}
+    container_name: ollama-bench
+    ports:
+      - "127.0.0.1:11435:11434"
+    volumes:
+      # Gleicher Pfad wie in ai-stack/.env (OLLAMA_MODELS_PATH).
+      - ${OLLAMA_MODELS_PATH:-//wsl.localhost/Ubuntu/home/crack/ai-models/ollama-models}:/root/.ollama
+    environment:
+      # Der einzige Parameter, der zwischen den Laeufen variiert.
+      - OLLAMA_KV_CACHE_TYPE=${OLLAMA_KV_CACHE_TYPE:-q8_0}
+      # Ab hier identisch zur Produktionskonfiguration in ai-stack/compose.yaml,
+      # damit die Messung den produktiven Pfad abbildet.
+      - OLLAMA_FLASH_ATTENTION=1
+      - OLLAMA_NUM_PARALLEL=1
+      # Modell zwischen den Zellen entladbar halten; die Harness steuert das
+      # ueber keep_alive und braucht kein dauerhaftes Pinning.
+      - OLLAMA_KEEP_ALIVE=30m
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: "no"

@@ -1,0 +1,30 @@
+# Override: dasselbe Setup ohne --enforce-eager, also mit CUDA-Graphs.
+#
+# Die vLLM-Recipe verlangt --enforce-eager auf einer einzelnen 5090, weil der
+# Start sonst im Graph-Capture mit OOM stirbt. Das gilt aber fuer NVFP4 mit
+# 21,81 GiB Gewichten. Der INT4-Checkpoint belegt laut Speicherprofil nur
+# 17,9 GiB (weights + non-torch) bei 30,2 GiB freiem Speicher -- da ist Platz.
+#
+# Ohne Graphs zahlt jede Decode-Iteration den vollen Kernel-Launch-Overhead,
+# was bei Einzelanfragen dominiert. Gemessen mit eager: 45 tok/s bei 8k, gegen
+# rund 110 tok/s unter Ollama.
+#
+#   docker compose -f compose.vllm.yml -f compose.vllm.graphs.yml up -d
+#
+# Stirbt der Start im Graph-Capture, ist --enforce-eager fuer diesen Checkpoint
+# doch noetig -- dann ohne diese Datei starten.
+
+services:
+  vllm-bench:
+    command:
+      - --model=/models/${VLLM_CKPT:-Qwen3.8-27B-INT4}
+      - --served-model-name=${VLLM_SERVED:-qwen3.8-bench}
+      - --max-model-len=${VLLM_MAX_LEN:-131072}
+      - --gpu-memory-utilization=${VLLM_GPU_UTIL:-0.92}
+      - --kv-cache-dtype=fp8
+      - --max-num-seqs=8
+      - --language-model-only
+      - --reasoning-parser=qwen3
+      - --enable-auto-tool-choice
+      - --tool-call-parser=qwen3_coder
+      - --speculative-config={"method":"mtp","num_speculative_tokens":3}

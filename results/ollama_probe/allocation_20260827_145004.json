@@ -1,0 +1,110 @@
+{
+  "chars_per_token": 4.493041749502982,
+  "rows": [
+    {
+      "fill": 8192,
+      "num_ctx": 8192,
+      "prompt_tokens": 8096,
+      "decode_tps": 137.72,
+      "vram_loaded_mib": 21992.0,
+      "vram_delta_mib": 18673.0,
+      "decode_tps_runs": [
+        129.76,
+        144.92,
+        139.96,
+        123.62,
+        137.72
+      ]
+    },
+    {
+      "fill": 8192,
+      "num_ctx": 32768,
+      "prompt_tokens": 8096,
+      "decode_tps": 138.51,
+      "vram_loaded_mib": 22959.0,
+      "vram_delta_mib": 19683.0,
+      "decode_tps_runs": [
+        136.8,
+        147.0,
+        138.51,
+        127.24,
+        146.03
+      ]
+    },
+    {
+      "fill": 8192,
+      "num_ctx": 131072,
+      "prompt_tokens": 8096,
+      "decode_tps": 137.36,
+      "vram_loaded_mib": 26954.0,
+      "vram_delta_mib": 23628.0,
+      "decode_tps_runs": [
+        126.0,
+        128.01,
+        145.83,
+        144.31,
+        137.36
+      ]
+    },
+    {
+      "fill": 8192,
+      "num_ctx": 262144,
+      "prompt_tokens": 8096,
+      "decode_tps": 62.49,
+      "vram_loaded_mib": 30976.0,
+      "vram_delta_mib": 27622.0,
+      "decode_tps_runs": [
+        56.58,
+        62.49,
+        81.21,
+        62.16,
+        68.17
+      ]
+    },
+    {
+      "fill": 32768,
+      "num_ctx": 32768,
+      "prompt_tokens": 32527,
+      "decode_tps": 131.31,
+      "vram_loaded_mib": 22001.0,
+      "vram_delta_mib": 19691.0,
+      "decode_tps_runs": [
+        131.31,
+        142.3,
+        117.96,
+        119.51,
+        133.41
+      ]
+    },
+    {
+      "fill": 32768,
+      "num_ctx": 131072,
+      "prompt_tokens": 32527,
+      "decode_tps": 131.75,
+      "vram_loaded_mib": 25966.0,
+      "vram_delta_mib": 23643.0,
+      "decode_tps_runs": [
+        130.07,
+        125.78,
+        138.58,
+        132.95,
+        131.75
+      ]
+    },
+    {
+      "fill": 32768,
+      "num_ctx": 262144,
+      "prompt_tokens": 32527,
+      "decode_tps": 64.44,
+      "vram_loaded_mib": 31051.0,
+      "vram_delta_mib": 28724.0,
+      "decode_tps_runs": [
+        64.44,
+        59.25,
+        64.48,
+        71.02,
+        59.81
+      ]
+    }
+  ]
+}
