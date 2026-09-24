@@ -559,9 +559,13 @@ def plot_layer_kurtosis(kv_dists_raw):
         ax.plot(peak_idx, 0, marker="v", color="white",
                 markersize=7, zorder=6,
                 markeredgecolor="#555", markeredgewidth=0.7)
+        # Weisse Schrift mit dunklem Rand: lesbar auf hellem Gelb wie auf
+        # Dunkelrot (vorher dunkelgrau, auf den Qwen-Zeilen unleserlich).
+        import matplotlib.patheffects as pe
         ax.annotate(f"L{peak_idx}", xy=(peak_idx, 0),
                     xytext=(0, -12), textcoords="offset points",
-                    ha="center", va="top", fontsize=7.5, color="#333")
+                    ha="center", va="top", fontsize=7.5, color="white",
+                    path_effects=[pe.withStroke(linewidth=2, foreground="#333")])
 
         # Right-margin stats
         mean_k = kv_dists_raw[model]["summary"]["key_kurtosis_mean"]
@@ -581,6 +585,13 @@ def plot_layer_kurtosis(kv_dists_raw):
         # Modelle ausser dem tiefsten falsch.
         tick_step = 4
         tick_pos  = list(range(0, n, tick_step))
+        # Letzten Layer (n-1, Zaehlung ab 0) immer beschriften, sonst ist das
+        # Achsenende nicht ablesbar. Liegt er direkt neben dem letzten Vierer-
+        # Tick, ersetzt er diesen, damit sich die Zahlen nicht ueberlagern.
+        if n - 1 - tick_pos[-1] < 2:
+            tick_pos[-1] = n - 1
+        else:
+            tick_pos.append(n - 1)
         ax.set_xticks(tick_pos)
         ax.set_xticklabels([str(t) for t in tick_pos], fontsize=8)
         if ax is axes[-1]:
