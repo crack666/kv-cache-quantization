@@ -210,14 +210,37 @@ def per_head_stats(tensor: torch.Tensor) -> list:
     return out
 
 
+TAIL_T = [round(0.25 * i, 2) for i in range(0, 101)]   # 0 bis 25 Standardabweichungen
+
+
+def tail_survival(tensor: torch.Tensor) -> dict:
+    """Anteil der Werte mit |z| > t fuer t in TAIL_T, z je Layer standardisiert.
+
+    Das Histogramm endet bei |z| = 6; die Kurtosis wird bei leptokurtischen
+    Modellen aber ueberwiegend von Werten jenseits davon bestimmt (bis ~18
+    Standardabweichungen). Die Ueberschreitungsanteile zeigen die Raender
+    ohne Abschneiden.
+    """
+    t = tensor.flatten().float()
+    z = ((t - t.mean()) / t.std()).abs()
+    z_sorted, _ = torch.sort(z)
+    grid = torch.tensor(TAIL_T, dtype=z_sorted.dtype)
+    n_le = torch.searchsorted(z_sorted, grid, right=True)
+    survival = (z_sorted.numel() - n_le).double() / z_sorted.numel()
+    return {"t": TAIL_T, "survival": [float(f"{s:.6g}") for s in survival.tolist()]}
+
+
 def analyze_layer(layer_idx: int, kv: dict, histogram_bins: int = 0,
-                  per_head: bool = False) -> dict:
+                  per_head: bool = False, tail: bool = False) -> dict:
     """Analyze K and V tensors for a single layer."""
     k_stats = compute_tensor_stats(kv["key"], histogram_bins=histogram_bins)
     v_stats = compute_tensor_stats(kv["value"], histogram_bins=histogram_bins)
     if per_head:
         k_stats["per_head"] = per_head_stats(kv["key"])
         v_stats["per_head"] = per_head_stats(kv["value"])
+    if tail:
+        k_stats["tail"] = tail_survival(kv["key"])
+        v_stats["tail"] = tail_survival(kv["value"])
 
     return {
         "layer": layer_idx,
@@ -249,6 +272,8 @@ def build_parser():
              "ersten --max-tokens Tokens genommen); eine zweite Stichprobe braucht "
              "einen anderen Split. Default: test"
     )
+    p.add_argument("--tail", action="store_true",
+                   help="Ueberschreitungsanteile P(|z| > t) fuer t = 0..25 je Layer ablegen")
     p.add_argument("--per-head", action="store_true",
                    help="Kennzahlen zusaetzlich je KV-Head ablegen")
     return p
@@ -311,7 +336,7 @@ def main():
     layer_stats = []
     for layer_idx in sorted(kv_data.keys()):
         stats = analyze_layer(layer_idx, kv_data[layer_idx], histogram_bins=args.histogram_bins,
-                              per_head=args.per_head)
+                              per_head=args.per_head, tail=args.tail)
         layer_stats.append(stats)
 
         # Print compact summary
@@ -371,6 +396,7 @@ def main():
             "dataset": "wikitext-2-raw-v1",
             "split": args.split,
             "per_head": args.per_head,
+            "tail": args.tail,
             "histogram_bins": args.histogram_bins,
         },
         "summary": summary,
