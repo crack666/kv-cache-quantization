@@ -25,6 +25,13 @@ Rotation falsch implementiert und alle weiteren Zahlen sind wertlos.
 Usage:
     python experiment_rotation.py --model Qwen/Qwen2-7B --nbits 4
     python experiment_rotation.py --analyze-only      # nur Kurtosis-Effekt
+    python experiment_rotation.py --analyze-only --sample fox   # zweite Stichprobe
+
+Stichprobe der Kurtosis-Messung: Vorgabe ist die Stichprobe der Haupttabelle
+(``analyze_kv_distributions.py``: WikiText-2, Test-Split, die ersten 4096
+Tokens). ``--sample fox`` wiederholt den Satz ``FOX``, bis dieselbe Laenge
+erreicht ist. Bis zum 30.09.2026 wurde er fest 64-mal wiederholt und ergab nur
+640 statt der angegebenen 2048 Tokens, deshalb prueft das Skript die Laenge.
 """
 
 import argparse
@@ -122,11 +129,34 @@ def excess_kurtosis(t: torch.Tensor) -> float:
     return float((z ** 4).mean() - 3.0)
 
 
-def analyze_rotation(model, tokenizer, H, device="cuda"):
+FOX = "The quick brown fox jumps over the lazy dog."
+
+
+def build_sample(tokenizer, sample: str, n_tokens: int):
+    """Eingabe der Kurtosis-Messung, genau ``n_tokens`` Tokens lang.
+
+    ``wikitext2``: genau die Stichprobe von ``analyze_kv_distributions.py``,
+    also der Test-Split und davon die ersten ``n_tokens`` Tokens.
+    ``fox``: der Satz ``FOX``, so oft wiederholt, dass ``n_tokens`` erreicht sind.
+    """
+    if sample == "fox":
+        per = len(tokenizer(FOX + "\n\n").input_ids)
+        text = "\n\n".join([FOX] * (n_tokens // per + 2))
+        ids = tokenizer(text, return_tensors="pt").input_ids[:, :n_tokens]
+    else:
+        from datasets import load_dataset
+        ds = load_dataset("wikitext", "wikitext-2-raw-v1", split="test")
+        text = "\n\n".join([t for t in ds["text"] if t.strip()])
+        ids = tokenizer(text, return_tensors="pt", truncation=True,
+                        max_length=n_tokens).input_ids
+    if ids.shape[-1] != n_tokens:
+        raise ValueError(f"Stichprobe {sample}: {ids.shape[-1]} statt {n_tokens} Tokens")
+    return ids
+
+
+def analyze_rotation(model, ids):
     """Kurtosis der Keys vor und nach der Rotation, je Layer."""
     from transformers.cache_utils import DynamicCache
-    ids = tokenizer("\n\n".join(["The quick brown fox jumps over the lazy dog."] * 64),
-                    return_tensors="pt").input_ids[:, :2048].to(device)
     cache = DynamicCache(config=model.config)
     with torch.no_grad():
         model(ids, past_key_values=cache, use_cache=True)
@@ -150,6 +180,10 @@ def main():
     ap.add_argument("--residual", type=int, default=128)
     ap.add_argument("--ppl-tokens", type=int, default=4096)
     ap.add_argument("--analyze-only", action="store_true")
+    ap.add_argument("--sample", choices=("wikitext2", "fox"), default="wikitext2",
+                    help="Stichprobe der Kurtosis-Messung, siehe Modulkopf")
+    ap.add_argument("--sample-tokens", type=int, default=4096)
+    ap.add_argument("--out-dir", type=Path, default=OUT)
     args = ap.parse_args()
 
     model, tokenizer, info = load_model(args.model, attn_backend="sdpa", device="cuda")
@@ -163,8 +197,10 @@ def main():
     _ROT["H"] = H
     install_rotation(model)
 
-    print("\nKurtosis-Effekt der Rotation (Key-Tensoren, 2048 Tokens):")
-    rows = analyze_rotation(model, tokenizer, H)
+    ids = build_sample(tokenizer, args.sample, args.sample_tokens).to("cuda")
+    n_tok = ids.shape[-1]
+    print(f"\nKurtosis-Effekt der Rotation (Key-Tensoren, {args.sample}, {n_tok} Tokens):")
+    rows = analyze_rotation(model, ids)
     import statistics as st
     before = [r[1] for r in rows]
     after = [r[2] for r in rows]
@@ -179,7 +215,21 @@ def main():
     print(f"   |max|     Mittel: {st.mean(amax_b):8.1f}  ->  {st.mean(amax_a):7.1f}")
     print(f"   |max|     Max   : {max(amax_b):8.1f}  ->  {max(amax_a):7.1f}")
 
+    kurt = {"sample": args.sample, "sample_tokens": n_tok,
+            "kurtosis_before_mean": st.mean(before),
+            "kurtosis_after_mean": st.mean(after),
+            "kurtosis_per_layer": [{"layer": i, "kurt_before": b, "kurt_after": a,
+                                    "absmax_before": mb, "absmax_after": ma}
+                                   for i, b, a, mb, ma in rows]}
+
     if args.analyze_only:
+        args.out_dir.mkdir(parents=True, exist_ok=True)
+        stamp = time.strftime("%Y%m%d_%H%M%S")
+        path = (args.out_dir / f"rotation_kurtosis_{args.model.split('/')[-1]}"
+                f"_{args.sample}{n_tok}_{stamp}.json")
+        json.dump({"model": args.model, "head_dim": head_dim, **kurt,
+                   "environment": info["environment"]}, open(path, "w"), indent=2)
+        print(f"Gespeichert: {path}")
         return 0
 
     conds = {
@@ -207,18 +257,14 @@ def main():
         print(f"  PPL = {ppl:.4f}   Delta = {ppl - ppl_ref:+.4f}   [{time.time()-t0:.0f}s]")
     _ROT["active"] = False
 
-    OUT.mkdir(parents=True, exist_ok=True)
+    args.out_dir.mkdir(parents=True, exist_ok=True)
     stamp = time.strftime("%Y%m%d_%H%M%S")
-    path = OUT / f"rotation_{args.model.split('/')[-1]}_int{args.nbits}_{stamp}.json"
+    path = args.out_dir / f"rotation_{args.model.split('/')[-1]}_int{args.nbits}_{stamp}.json"
     json.dump({"model": args.model, "nbits": args.nbits, "axis": args.axis,
                "q_group_size": args.group_size, "residual_length": args.residual,
                "head_dim": head_dim, "ppl_tokens": args.ppl_tokens,
-               "kurtosis_before_mean": st.mean(before),
-               "kurtosis_after_mean": st.mean(after),
-               "kurtosis_per_layer": [{"layer": i, "kurt_before": b, "kurt_after": a,
-                                       "absmax_before": mb, "absmax_after": ma}
-                                      for i, b, a, mb, ma in rows],
-               "results": results}, open(path, "w"), indent=2)
+               **kurt, "results": results,
+               "environment": info["environment"]}, open(path, "w"), indent=2)
 
     print("\n" + "=" * 58)
     print(f"{'Bedingung':<14}{'PPL':>12}{'Delta':>12}")
