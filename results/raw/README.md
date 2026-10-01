@@ -16,6 +16,9 @@ Dateiliste und der Herkunft jeder einzelnen Datei.
 | `rotation/` | 2026-10-01 | Hadamard-Rotationsexperiment, in der Thesis als Pfad zitiert. Je Modell ein Lauf mit Perplexität und Kurtosis an WikiText-2, dazu die Kurtosis der zweiten Stichprobe (wiederholter Satz), beide 4096 Tokens. Gelesen von `scripts/statistical_tests.py` |
 | `kv_split/` | 2026-08-04 | Getrennte Quantisierung von Keys und Values, als Pfad zitiert |
 | `layerwise/` | 2026-08-04 | Layer-weise Quantisierung nach Kurtosis, als Pfad zitiert |
+| `layer_exclusion/` | 2026-09-24 | Qwen2-7B mit je einem Layer in FP16, grenzt das INT4-Versagen auf Layer 0 ein (`scripts/experiment_layer_exclusion.py`) |
+| `key_bias/` | 2026-09-24 | Bias der Key-Projektion in Layer 0 von Qwen2-7B (INT4, INT2, KIVI), Ursache des Qwen2-Versagens (`scripts/experiment_key_bias.py`) |
+| `kv_tails/` | 2026-09-24 | Verteilungsränder der Keys aller fünf Modelle, gleiche Stichprobe wie `kv_distributions_v2/` (`analyze_kv_distributions.py --tail`) |
 
 ## Als Nachweis gebraucht, nicht für Ergebniswerte
 
