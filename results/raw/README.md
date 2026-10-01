@@ -13,7 +13,7 @@ Dateiliste und der Herkunft jeder einzelnen Datei.
 |---|---|---|
 | `long_context_final/` | 2026-07-17/18 | **Hauptdatensatz.** Speicher, Durchsatz, Perplexität, Retrieval. Gelesen von `scripts/verify_thesis_numbers.py` |
 | `kv_distributions_v2/` | 2026-05-04 | Verteilungskennzahlen (Kurtosis, Outlier-Ratio, Dynamic Range, Varianzverhältnis) |
-| `rotation/` | 2026-08-04 | Hadamard-Rotationsexperiment, in der Thesis als Pfad zitiert |
+| `rotation/` | 2026-10-01 | Hadamard-Rotationsexperiment, in der Thesis als Pfad zitiert. Je Modell ein Lauf mit Perplexität und Kurtosis an WikiText-2, dazu die Kurtosis der zweiten Stichprobe (wiederholter Satz), beide 4096 Tokens. Gelesen von `scripts/statistical_tests.py` |
 | `kv_split/` | 2026-08-04 | Getrennte Quantisierung von Keys und Values, als Pfad zitiert |
 | `layerwise/` | 2026-08-04 | Layer-weise Quantisierung nach Kurtosis, als Pfad zitiert |
 

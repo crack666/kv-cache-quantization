@@ -1,0 +1,270 @@
+{
+  "model": "Qwen/Qwen3-8B",
+  "head_dim": 128,
+  "sample": "fox",
+  "sample_tokens": 4096,
+  "kurtosis_before_mean": 26.30127551820543,
+  "kurtosis_after_mean": -0.30912529097663033,
+  "kurtosis_per_layer": [
+    {
+      "layer": 0,
+      "kurt_before": 149.7890625,
+      "kurt_after": -1.6394262313842773,
+      "absmax_before": 218.375,
+      "absmax_after": 28.609375
+    },
+    {
+      "layer": 1,
+      "kurt_before": 83.12709045410156,
+      "kurt_after": -0.9541897773742676,
+      "absmax_before": 49.28125,
+      "absmax_after": 11.3828125
+    },
+    {
+      "layer": 2,
+      "kurt_before": 23.92550277709961,
+      "kurt_after": -0.2778611183166504,
+      "absmax_before": 20.5,
+      "absmax_after": 8.390625
+    },
+    {
+      "layer": 3,
+      "kurt_before": 5.229846000671387,
+      "kurt_after": 0.09599947929382324,
+      "absmax_before": 24.4375,
+      "absmax_after": 9.5078125
+    },
+    {
+      "layer": 4,
+      "kurt_before": 53.1934814453125,
+      "kurt_after": -0.5290651321411133,
+      "absmax_before": 44.53125,
+      "absmax_after": 12.7578125
+    },
+    {
+      "layer": 5,
+      "kurt_before": 78.72230529785156,
+      "kurt_after": -0.7910802364349365,
+      "absmax_before": 74.125,
+      "absmax_after": 18.234375
+    },
+    {
+      "layer": 6,
+      "kurt_before": 50.40073776245117,
+      "kurt_after": -0.6767525672912598,
+      "absmax_before": 28.53125,
+      "absmax_after": 9.765625
+    },
+    {
+      "layer": 7,
+      "kurt_before": 4.188201904296875,
+      "kurt_after": 0.013042926788330078,
+      "absmax_before": 31.59375,
+      "absmax_after": 9.203125
+    },
+    {
+      "layer": 8,
+      "kurt_before": 85.19029998779297,
+      "kurt_after": -1.1583096981048584,
+      "absmax_before": 43.125,
+      "absmax_after": 10.8671875
+    },
+    {
+      "layer": 9,
+      "kurt_before": 4.251858711242676,
+      "kurt_after": -0.055109262466430664,
+      "absmax_before": 24.21875,
+      "absmax_after": 8.8828125
+    },
+    {
+      "layer": 10,
+      "kurt_before": 68.3701171875,
+      "kurt_after": -0.9648263454437256,
+      "absmax_before": 40.4375,
+      "absmax_after": 10.6640625
+    },
+    {
+      "layer": 11,
+      "kurt_before": 40.15008544921875,
+      "kurt_after": -0.45035648345947266,
+      "absmax_before": 30.703125,
+      "absmax_after": 10.4765625
+    },
+    {
+      "layer": 12,
+      "kurt_before": 23.252517700195312,
+      "kurt_after": -0.26835203170776367,
+      "absmax_before": 21.515625,
+      "absmax_after": 10.1640625
+    },
+    {
+      "layer": 13,
+      "kurt_before": 4.433362007141113,
+      "kurt_after": -0.0015740394592285156,
+      "absmax_before": 26.171875,
+      "absmax_after": 9.0625
+    },
+    {
+      "layer": 14,
+      "kurt_before": 28.02918243408203,
+      "kurt_after": -0.5058541297912598,
+      "absmax_before": 24.90625,
+      "absmax_after": 10.1015625
+    },
+    {
+      "layer": 15,
+      "kurt_before": 5.0818023681640625,
+      "kurt_after": 0.06042766571044922,
+      "absmax_before": 23.703125,
+      "absmax_after": 9.8125
+    },
+    {
+      "layer": 16,
+      "kurt_before": 14.253875732421875,
+      "kurt_after": -0.1039271354675293,
+      "absmax_before": 25.46875,
+      "absmax_after": 8.9375
+    },
+    {
+      "layer": 17,
+      "kurt_before": 4.334371566772461,
+      "kurt_after": -0.059112548828125,
+      "absmax_before": 22.328125,
+      "absmax_after": 8.5625
+    },
+    {
+      "layer": 18,
+      "kurt_before": 22.170127868652344,
+      "kurt_after": -0.3027520179748535,
+      "absmax_before": 22.15625,
+      "absmax_after": 9.34375
+    },
+    {
+      "layer": 19,
+      "kurt_before": 3.607314109802246,
+      "kurt_after": -0.05705142021179199,
+      "absmax_before": 26.125,
+      "absmax_after": 10.2265625
+    },
+    {
+      "layer": 20,
+      "kurt_before": 2.769571304321289,
+      "kurt_after": -0.04788994789123535,
+      "absmax_before": 23.203125,
+      "absmax_after": 8.9140625
+    },
+    {
+      "layer": 21,
+      "kurt_before": 11.654258728027344,
+      "kurt_after": -0.10523748397827148,
+      "absmax_before": 21.671875,
+      "absmax_after": 9.1015625
+    },
+    {
+      "layer": 22,
+      "kurt_before": 15.199274063110352,
+      "kurt_after": -0.09037113189697266,
+      "absmax_before": 25.96875,
+      "absmax_after": 10.8203125
+    },
+    {
+      "layer": 23,
+      "kurt_before": 17.92746353149414,
+      "kurt_after": -0.24451136589050293,
+      "absmax_before": 22.046875,
+      "absmax_after": 11.53125
+    },
+    {
+      "layer": 24,
+      "kurt_before": 2.880582809448242,
+      "kurt_after": -0.1180567741394043,
+      "absmax_before": 25.984375,
+      "absmax_after": 9.1875
+    },
+    {
+      "layer": 25,
+      "kurt_before": 7.977975845336914,
+      "kurt_after": -0.13593363761901855,
+      "absmax_before": 18.015625,
+      "absmax_after": 9.328125
+    },
+    {
+      "layer": 26,
+      "kurt_before": 7.265478134155273,
+      "kurt_after": -0.09035205841064453,
+      "absmax_before": 18.171875,
+      "absmax_after": 8.265625
+    },
+    {
+      "layer": 27,
+      "kurt_before": 10.530247688293457,
+      "kurt_after": -0.13495206832885742,
+      "absmax_before": 17.734375,
+      "absmax_after": 8.8671875
+    },
+    {
+      "layer": 28,
+      "kurt_before": 13.598091125488281,
+      "kurt_after": -0.19250011444091797,
+      "absmax_before": 19.0625,
+      "absmax_after": 9.3125
+    },
+    {
+      "layer": 29,
+      "kurt_before": 7.8647356033325195,
+      "kurt_after": -0.1291193962097168,
+      "absmax_before": 22.09375,
+      "absmax_after": 8.15625
+    },
+    {
+      "layer": 30,
+      "kurt_before": 22.911983489990234,
+      "kurt_after": -0.2424602508544922,
+      "absmax_before": 22.25,
+      "absmax_after": 9.3984375
+    },
+    {
+      "layer": 31,
+      "kurt_before": 4.430994987487793,
+      "kurt_after": -0.11019325256347656,
+      "absmax_before": 16.984375,
+      "absmax_after": 8.75
+    },
+    {
+      "layer": 32,
+      "kurt_before": 8.987833976745605,
+      "kurt_after": -0.2017679214477539,
+      "absmax_before": 15.34375,
+      "absmax_after": 8.796875
+    },
+    {
+      "layer": 33,
+      "kurt_before": 3.754671096801758,
+      "kurt_after": 0.01993560791015625,
+      "absmax_before": 20.4375,
+      "absmax_after": 8.3125
+    },
+    {
+      "layer": 34,
+      "kurt_before": 16.990314483642578,
+      "kurt_after": -0.22732973098754883,
+      "absmax_before": 20.859375,
+      "absmax_after": 8.921875
+    },
+    {
+      "layer": 35,
+      "kurt_before": 40.40129852294922,
+      "kurt_after": -0.4516408443450928,
+      "absmax_before": 31.046875,
+      "absmax_after": 11.0859375
+    }
+  ],
+  "environment": {
+    "python_version": "3.12.3",
+    "pytorch_version": "2.8.0+cu128",
+    "transformers_version": "5.5.4",
+    "cuda_version": "12.8",
+    "gpu_name": "NVIDIA GeForce RTX 5090",
+    "gpu_vram_gb": 34.2
+  }
+}

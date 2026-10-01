@@ -27,7 +27,8 @@ Ergebnis dieser Stichprobengroesse kann darunter liegen.
 Datenquellen (alle im Repositorium):
   results/raw/kv_distributions_v2/kv_dist_*.json   Key-Kurtosis je Layer/Modell
   results/tables/phase_b_long_context.csv          Delta-PPL je Modell/Konfiguration
-  results/raw/rotation/rotation_*.json             zweite Kalibrationsstichprobe
+  results/raw/rotation/rotation_Qwen*_int*.json    Kurtosis vor/nach der Rotation
+  results/raw/rotation/rotation_kurtosis_*.json    zweite Kalibrationsstichprobe
   results/tables/phase_b_long_context.csv          Needle-Trefferquote je Konfig.
 
 Usage:
@@ -46,12 +47,17 @@ DIST_DIR = BASE / "results" / "raw" / "kv_distributions_v2"
 PHASE_B = BASE / "results" / "tables" / "phase_b_long_context.csv"
 ROT_DIR = BASE / "results" / "raw" / "rotation"
 
-# Zweite Kalibrationsstichprobe. Von den drei Qwen2-Laeufen desselben Tages ist
-# nur der letzte auswertbar; die beiden frueheren scheiterten an der
-# Kontrollbedingung (siehe Fussnote im Ergebniskapitel).
+# Rotationsexperiment: Kurtosis vor und nach der Rotation an der Stichprobe der
+# Haupttabelle (WikiText-2, 4096 Tokens), im selben Lauf wie die Perplexitaet.
 ROTATION_RUNS = {
-    "Qwen3-8B": "rotation_Qwen3-8B_int2_20260804_114123.json",
-    "Qwen2-7B": "rotation_Qwen2-7B_int4_20260804_112454.json",
+    "Qwen3-8B": "rotation_Qwen3-8B_int2_20261001_033425.json",
+    "Qwen2-7B": "rotation_Qwen2-7B_int4_20261001_032720.json",
+}
+
+# Zweite Kalibrationsstichprobe: ein wiederholter Satz, gleich lang (4096 Tokens).
+SECOND_SAMPLE_RUNS = {
+    "Qwen3-8B": "rotation_kurtosis_Qwen3-8B_fox4096_20261001_032058.json",
+    "Qwen2-7B": "rotation_kurtosis_Qwen2-7B_fox4096_20261001_032035.json",
 }
 
 # Die Quellen benennen die Modelle unterschiedlich: Die Verteilungsmessungen
@@ -176,28 +182,17 @@ def layer_kurtosis(model):
 
 
 def rotation_layer_kurtosis(model):
-    """Key-Kurtosis je Layer aus der zweiten Stichprobe (Rotationsexperiment)."""
-    data = json.loads((ROT_DIR / ROTATION_RUNS[model]).read_text(encoding="utf-8"))
-    # Die Laeufe stammen aus zwei Schema-Staenden des Skripts: der aeltere nennt
-    # die Felder "before"/"after", der neuere "kurt_before"/"kurt_after".
-    per_layer = {}
-    for entry in data["kurtosis_per_layer"]:
-        value = entry.get("kurt_before", entry.get("before"))
-        if value is None:
-            raise KeyError(f"kein Kurtosis-Feld in {ROTATION_RUNS[model]}")
-        per_layer[entry["layer"]] = value
+    """Key-Kurtosis je Layer aus der zweiten Stichprobe (wiederholter Satz)."""
+    data = json.loads((ROT_DIR / SECOND_SAMPLE_RUNS[model]).read_text(encoding="utf-8"))
+    per_layer = {e["layer"]: e["kurt_before"] for e in data["kurtosis_per_layer"]}
     return per_layer, data["kurtosis_before_mean"]
 
 
 def rotation_before_after(model):
-    """Key-Kurtosis je Layer vor und nach der Hadamard-Rotation (2048 Tokens)."""
+    """Key-Kurtosis je Layer vor und nach der Hadamard-Rotation (WikiText-2, 4096 Tokens)."""
     data = json.loads((ROT_DIR / ROTATION_RUNS[model]).read_text(encoding="utf-8"))
-    before, after = [], []
-    for entry in data["kurtosis_per_layer"]:
-        before.append(entry.get("kurt_before", entry.get("before")))
-        after.append(entry.get("kurt_after", entry.get("after")))
-    if None in before or None in after:
-        raise KeyError(f"Kurtosis-Feld fehlt in {ROTATION_RUNS[model]}")
+    before = [e["kurt_before"] for e in data["kurtosis_per_layer"]]
+    after = [e["kurt_after"] for e in data["kurtosis_per_layer"]]
     return before, after, data["kurtosis_after_mean"]
 
 def gemma_layer_groups():
@@ -291,7 +286,7 @@ def main():
     print("=" * 78)
     print("Stabilitaet gegenueber der Kalibrationsstichprobe")
     print("=" * 78)
-    print(f"{'Modell':<12}{'kappa 4096':>12}{'kappa 2048':>12}{'Abw.':>8}"
+    print(f"{'Modell':<12}{'kappa Wiki':>12}{'kappa Satz':>12}{'Abw.':>8}"
           f"{'rho (Layer)':>13}{'Layer':>7}{'argmax gleich':>15}")
     for model in ("Qwen3-8B", "Qwen2-7B"):
         main_layers = layer_kurtosis(model)
@@ -307,8 +302,9 @@ def main():
         print(f"{model:<12}{main_mean:>12.2f}{rot_mean:>12.2f}{dev:>+7.1f}%"
               f"{rho:>13.2f}{len(shared):>7}{'ja' if same else 'nein':>15}")
     print()
-    print("  Die absoluten Werte haengen leicht von der Stichprobe ab, die")
-    print("  Rangfolge der Layer dagegen kaum. Das traegt die Layer-Auswahl.")
+    print("  Beide Stichproben sind gleich lang, die Abweichung kommt also vom Text.")
+    print("  Die absoluten Werte haengen von der Stichprobe ab, die Rangfolge der")
+    print("  Layer dagegen kaum. Das traegt die Layer-Auswahl.")
 
     print()
     print("=" * 78)

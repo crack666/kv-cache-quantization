@@ -1,0 +1,237 @@
+{
+  "model": "Qwen/Qwen2-7B",
+  "nbits": 4,
+  "axis": 1,
+  "q_group_size": 64,
+  "residual_length": 128,
+  "head_dim": 128,
+  "ppl_tokens": 4096,
+  "sample": "wikitext2",
+  "sample_tokens": 4096,
+  "kurtosis_before_mean": 19.56791845389775,
+  "kurtosis_after_mean": 0.4962694985525949,
+  "kurtosis_per_layer": [
+    {
+      "layer": 0,
+      "kurt_before": 17.925251007080078,
+      "kurt_after": 0.26154208183288574,
+      "absmax_before": 167.375,
+      "absmax_after": 75.5
+    },
+    {
+      "layer": 1,
+      "kurt_before": 16.145736694335938,
+      "kurt_after": 2.153092861175537,
+      "absmax_before": 46.4375,
+      "absmax_after": 26.90625
+    },
+    {
+      "layer": 2,
+      "kurt_before": 25.153099060058594,
+      "kurt_after": 2.327958106994629,
+      "absmax_before": 34.25,
+      "absmax_after": 18.140625
+    },
+    {
+      "layer": 3,
+      "kurt_before": 69.07713317871094,
+      "kurt_after": 2.7978858947753906,
+      "absmax_before": 74.125,
+      "absmax_after": 27.59375
+    },
+    {
+      "layer": 4,
+      "kurt_before": 5.800446510314941,
+      "kurt_after": -0.08037066459655762,
+      "absmax_before": 12.75,
+      "absmax_after": 9.21875
+    },
+    {
+      "layer": 5,
+      "kurt_before": 11.96845531463623,
+      "kurt_after": -0.17966437339782715,
+      "absmax_before": 16.359375,
+      "absmax_after": 7.99609375
+    },
+    {
+      "layer": 6,
+      "kurt_before": 10.693639755249023,
+      "kurt_after": 0.011888504028320312,
+      "absmax_before": 19.09375,
+      "absmax_after": 9.1015625
+    },
+    {
+      "layer": 7,
+      "kurt_before": 9.924875259399414,
+      "kurt_after": 0.04917430877685547,
+      "absmax_before": 15.703125,
+      "absmax_after": 11.140625
+    },
+    {
+      "layer": 8,
+      "kurt_before": 6.4672393798828125,
+      "kurt_after": -0.01627349853515625,
+      "absmax_before": 15.6796875,
+      "absmax_after": 10.6484375
+    },
+    {
+      "layer": 9,
+      "kurt_before": 9.142664909362793,
+      "kurt_after": -0.08059883117675781,
+      "absmax_before": 18.15625,
+      "absmax_after": 9.2890625
+    },
+    {
+      "layer": 10,
+      "kurt_before": 10.081903457641602,
+      "kurt_after": -0.08025360107421875,
+      "absmax_before": 15.515625,
+      "absmax_after": 9.59375
+    },
+    {
+      "layer": 11,
+      "kurt_before": 7.389571189880371,
+      "kurt_after": 0.02335357666015625,
+      "absmax_before": 15.2109375,
+      "absmax_after": 10.9609375
+    },
+    {
+      "layer": 12,
+      "kurt_before": 7.908168792724609,
+      "kurt_after": 0.18030357360839844,
+      "absmax_before": 21.625,
+      "absmax_after": 10.2265625
+    },
+    {
+      "layer": 13,
+      "kurt_before": 58.616092681884766,
+      "kurt_after": 0.861417293548584,
+      "absmax_before": 45.71875,
+      "absmax_after": 15.109375
+    },
+    {
+      "layer": 14,
+      "kurt_before": 5.158278465270996,
+      "kurt_after": -0.05910062789916992,
+      "absmax_before": 20.25,
+      "absmax_after": 9.4296875
+    },
+    {
+      "layer": 15,
+      "kurt_before": 23.553958892822266,
+      "kurt_after": 0.760749340057373,
+      "absmax_before": 28.890625,
+      "absmax_after": 11.296875
+    },
+    {
+      "layer": 16,
+      "kurt_before": 6.4325971603393555,
+      "kurt_after": -0.011279582977294922,
+      "absmax_before": 22.453125,
+      "absmax_after": 10.5078125
+    },
+    {
+      "layer": 17,
+      "kurt_before": 4.646310329437256,
+      "kurt_after": -0.0174710750579834,
+      "absmax_before": 17.390625,
+      "absmax_after": 10.7109375
+    },
+    {
+      "layer": 18,
+      "kurt_before": 8.07086181640625,
+      "kurt_after": -0.04880833625793457,
+      "absmax_before": 18.03125,
+      "absmax_after": 9.65625
+    },
+    {
+      "layer": 19,
+      "kurt_before": 103.52999877929688,
+      "kurt_after": 1.2720050811767578,
+      "absmax_before": 51.125,
+      "absmax_after": 15.28125
+    },
+    {
+      "layer": 20,
+      "kurt_before": 5.610222816467285,
+      "kurt_after": -0.017864227294921875,
+      "absmax_before": 15.2421875,
+      "absmax_after": 10.2109375
+    },
+    {
+      "layer": 21,
+      "kurt_before": 9.294452667236328,
+      "kurt_after": -0.07064247131347656,
+      "absmax_before": 18.296875,
+      "absmax_after": 9.8125
+    },
+    {
+      "layer": 22,
+      "kurt_before": 6.696062088012695,
+      "kurt_after": -0.045801639556884766,
+      "absmax_before": 16.90625,
+      "absmax_after": 9.7578125
+    },
+    {
+      "layer": 23,
+      "kurt_before": 9.81589126586914,
+      "kurt_after": -0.11355733871459961,
+      "absmax_before": 18.765625,
+      "absmax_after": 9.7421875
+    },
+    {
+      "layer": 24,
+      "kurt_before": 12.932437896728516,
+      "kurt_after": -0.09316849708557129,
+      "absmax_before": 18.21875,
+      "absmax_after": 8.6796875
+    },
+    {
+      "layer": 25,
+      "kurt_before": 14.371309280395508,
+      "kurt_after": 0.0944676399230957,
+      "absmax_before": 18.40625,
+      "absmax_after": 8.8203125
+    },
+    {
+      "layer": 26,
+      "kurt_before": 8.214616775512695,
+      "kurt_after": 0.004895210266113281,
+      "absmax_before": 17.703125,
+      "absmax_after": 8.6484375
+    },
+    {
+      "layer": 27,
+      "kurt_before": 63.28044128417969,
+      "kurt_after": 4.011667251586914,
+      "absmax_before": 410.75,
+      "absmax_after": 145.5
+    }
+  ],
+  "results": {
+    "fp16": {
+      "ppl": 6.2642,
+      "delta": 0.0
+    },
+    "quant_only": {
+      "ppl": 3057.8196,
+      "delta": 3051.5553999999997
+    },
+    "rot_only": {
+      "ppl": 6.2642,
+      "delta": 0.0
+    },
+    "rot_quant": {
+      "ppl": 2883.9043,
+      "delta": 2877.6401
+    }
+  },
+  "environment": {
+    "python_version": "3.12.3",
+    "pytorch_version": "2.8.0+cu128",
+    "transformers_version": "5.5.4",
+    "cuda_version": "12.8",
+    "gpu_name": "NVIDIA GeForce RTX 5090",
+    "gpu_vram_gb": 34.2
+  }
+}
