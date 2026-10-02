@@ -26,6 +26,8 @@ import numpy as np
 BASE = Path(__file__).parent.parent
 LONG_CTX = BASE / "results/raw/long_context_final"
 KV_DIST  = BASE / "results/raw/kv_distributions_v2"
+# Gleiche Stichprobe wie KV_DIST, zusaetzlich Ueberschreitungsanteile (--tail)
+KV_TAILS = BASE / "results/raw/kv_tails"
 OUT_DIR  = BASE / "results/figures/thesis"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -696,6 +698,88 @@ def plot_kurtosis_violin(kv_dists_raw):
     plt.close(fig)
 
 
+def plot_kv_key_tails(tails_raw):
+    """Verteilungsraender der Keys: Anteil der Werte jenseits von t Standardabweichungen.
+
+    Ersetzt die Histogramm-Darstellung (plot_kv_key_distributions), die bei
+    |z| = 6 abschneidet: Bei den leptokurtischen Modellen liegen dort nur
+    rund ein Viertel dessen, was die Kurtosis misst; die Ausreisser reichen
+    bis ~18 Standardabweichungen. Links alle Layer gemittelt (bei gleicher
+    Wertezahl je Layer der gepoolte Anteil), rechts Layer 0 der beiden
+    Qwen-Modelle, deren Raender sich grundsaetzlich unterscheiden.
+    """
+    from scipy.special import erfc
+
+    # Dieselben Farben wie die ersetzte Verteilungsgrafik; diese Palette
+    # besteht die Farbsehschwaeche-Pruefung, die globale MODEL_COLORS nicht.
+    # Linienart als zweite Kodierung, weil Qwen2 und Mistral bei
+    # Rot-Gruen-Schwaeche nahe beieinander liegen.
+    style = {
+        "Gemma-4-E4B": ("#E63946", "-"),
+        "Mistral-7B":  ("#1D6FA4", "--"),
+        "Yi-1.5-9B":   ("#2A9D8F", "-."),
+        "Qwen2-7B":    ("#7B2D8B", (0, (1, 1.2))),
+        "Qwen3-8B":    ("#F4830A", (0, (6, 1.5, 1, 1.5, 1, 1.5))),
+    }
+    order = [m for m in ["Gemma-4-E4B", "Mistral-7B", "Yi-1.5-9B", "Qwen2-7B", "Qwen3-8B"]
+             if m in tails_raw]
+    if not order:
+        print("  [plot_kv_key_tails] Keine Tail-Daten gefunden - uebersprungen.")
+        return
+
+    y_floor = 1e-8
+    t_ref = np.linspace(0, 20, 401)
+    ref = erfc(t_ref / np.sqrt(2))
+
+    def curve(layers):
+        t = np.array(layers[0]["key"]["tail"]["t"])
+        s = np.mean([l["key"]["tail"]["survival"] for l in layers], axis=0)
+        return t, s
+
+    # Auf Textbreite (~6.3 in) gesetzt: 8.4 in Breite halten die Schrift
+    # im Satz bei rund 7 pt; mit 12 in war die Legende kaum lesbar.
+    fig, (ax_a, ax_b) = plt.subplots(1, 2, figsize=(8.4, 3.8), sharey=True)
+    for ax in (ax_a, ax_b):
+        ax.plot(t_ref, ref, color="black", lw=1.3, ls=(0, (4, 3)), label="$\\mathcal{N}(0,1)$")
+        for t0 in (3, 6):
+            ax.axvline(t0, color="#999", lw=0.8, ls=":", zorder=0)
+        ax.set_yscale("log")
+        ax.set_ylim(y_floor, 1.0)
+        ax.set_xlim(0, 20)
+        # 3 und 6 als Achsenmarken statt Textlabels: die Labels kollidierten
+        # mit den Panel-Titeln, die Marken erklaeren die punktierten Linien
+        ax.set_xticks([0, 3, 6, 10, 15, 20])
+        ax.set_xlabel("Schwelle $t$ in Standardabweichungen")
+
+    for m in order:
+        t, s = curve(tails_raw[m]["layers"])
+        keep = s > 0
+        kappa = tails_raw[m]["summary"]["key_kurtosis_mean"]
+        color, ls = style[m]
+        ax_a.plot(t[keep], s[keep], color=color, ls=ls, lw=2,
+                  label=f"{m}  ($\\bar{{\\kappa}}$ = {kappa:.1f})")
+    ax_a.set_ylabel("Anteil der Key-Werte mit $|z| > t$")
+    ax_a.set_title("(a) alle Layer gemittelt", fontsize=10)
+    ax_a.legend(loc="upper right", fontsize=8.5, frameon=True)
+
+    for m in ("Qwen2-7B", "Qwen3-8B"):
+        if m not in tails_raw:
+            continue
+        layer0 = [l for l in tails_raw[m]["layers"] if l["layer"] == 0]
+        t, s = curve(layer0)
+        keep = s > 0
+        color, ls = style[m]
+        k0 = layer0[0]["key"]["kurtosis"]
+        ax_b.plot(t[keep], s[keep], color=color, ls=ls, lw=2,
+                  label=f"{m}, Layer 0  ($\\kappa$ = {k0:.1f})")
+    ax_b.set_title("(b) Layer 0 der beiden Qwen-Modelle", fontsize=10)
+    ax_b.legend(loc="upper right", fontsize=8.5, frameon=True)
+
+    fig.tight_layout()
+    save_fig(fig, "kv_key_tails.pdf", 8)
+    plt.close(fig)
+
+
 def plot_kv_key_distributions(kv_dists_raw):
     """Abbildung 7 — Key-Aktivierungsverteilungen: Linear (links) + Log-Skala (rechts).
 
@@ -820,6 +904,12 @@ if __name__ == "__main__":
     plot_layer_kurtosis(kv_dists_raw)
     plot_kurtosis_violin(kv_dists_raw)
     plot_kv_key_distributions(kv_dists_raw)
+
+    tails_raw = {}
+    for f in sorted(glob.glob(str(KV_TAILS / "*.json"))):
+        d = json.load(open(f))
+        tails_raw[MODEL_LABELS.get(d["model"], d["model"])] = d
+    plot_kv_key_tails(tails_raw)
 
     print()
     print(f"All plots saved to: {OUT_DIR}")
